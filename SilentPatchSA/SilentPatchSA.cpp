@@ -3246,6 +3246,24 @@ namespace JetThrustersFix
 }
 
 
+// ============= Fix Skimmer not spawning correctly (and shooting up the sky) on Windows 11 24H2 =============
+// Missing vehicles.ide values should have always caused issues, but only in 24H2 fgets/LeaveCriticalSection uses enough stack
+// to scramble the stale values in CFileLoader::LoadVehicleObject.
+namespace SkimmerVehiclesIdeFix
+{
+	static int (*orgSscanf)(const char* s, const char* format, ...);
+	static int sscanf_Defaults(const char* s, const char* format, int* objID, char* modelName, char* texName, char* type, char* handlingID, char* gameName, char* anims, char* vehClass,
+				int* frequency, int* flags, int* comprules, int* wheelModelID, float* wheelSize1, float* wheelSize2, int* wheelUpgradeClass)
+	{
+		*wheelModelID = -1;
+		*wheelSize1 = 0.7f;
+		*wheelSize2 = 0.7f;
+		*wheelUpgradeClass = -1;
+
+		return orgSscanf(s, format, objID, modelName, texName, type, handlingID, gameName, anims, vehClass, frequency, flags, comprules, wheelModelID, wheelSize1, wheelSize2, wheelUpgradeClass);
+	}
+}
+
 // ============= LS-RP Mode stuff =============
 namespace LSRPMode
 {
@@ -6511,6 +6529,16 @@ void Patch_SA_10(HINSTANCE hInstance)
 	}
 
 
+	// Fix Skimmer not spawning correctly (and shooting up the sky) on Windows 11 24H2
+	// Missing vehicles.ide values should have always caused issues, but only in 24H2 fgets/LeaveCriticalSection uses enough stack
+	// to scramble the stale values in CFileLoader::LoadVehicleObject.
+	{
+		using namespace SkimmerVehiclesIdeFix;
+
+		InterceptCall(0x5B6FC7, orgSscanf, sscanf_Defaults);
+	}
+
+
 #if FULL_PRECISION_D3D
 	// Test - full precision D3D device
 	Patch<uint8_t>( 0x7F672B+1, *(uint8_t*)(0x7F672B+1) | D3DCREATE_FPU_PRESERVE );
@@ -8674,6 +8702,20 @@ void Patch_SA_NewBinaries_Common(HINSTANCE hInstance)
 			thrust.get(3).get<void>(3),
 		};
 		HookEach_MatrixMultiply(matrixMult, InterceptCall);
+	}
+	TXN_CATCH();
+
+
+	// Fix Skimmer not spawning correctly (and shooting up the sky) on Windows 11 24H2
+	// Missing vehicles.ide values should have always caused issues, but only in 24H2 fgets/LeaveCriticalSection uses enough stack
+	// to scramble the stale values in CFileLoader::LoadVehicleObject.
+	try
+	{
+		using namespace SkimmerVehiclesIdeFix;
+
+		auto loadVehicleModelSscanf = get_pattern("52 68 ? ? ? ? 50 E8 ? ? ? ? 8B 4D E0 51", 7);
+
+		InterceptCall(loadVehicleModelSscanf, orgSscanf, sscanf_Defaults);
 	}
 	TXN_CATCH();
 }
