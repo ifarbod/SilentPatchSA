@@ -324,18 +324,38 @@ __declspec(naked) void SubtitlesShadowFix()
 	}
 }
 
-__declspec(naked) void III_SensResetFix()
+// ============= Don't reset mouse sensitivity on New Game =============
+namespace MouseSensNewGame
 {
-	_asm
+	class CCamera
 	{
-		mov     ecx, 0x3A76
-		mov     edi, ebp
-		fld     dword ptr [ebp+0x194]
-		fld     dword ptr [ebp+0x198]
-		rep		stosd
-		fstp	dword ptr [ebp+0x198]
-		fstp	dword ptr [ebp+0x194]
-		ret
+	public:
+		std::byte _gap[0x194];
+		float m_horizontalAccel, m_verticalAccel;
+	};
+
+	static float DefaultHorizontalAccel, DefaultVerticalAccel;
+	__declspec(naked) void CameraInit_KeepSensitivity()
+	{
+		_asm
+		{
+			mov     ecx, 0x3A76
+			mov     edi, ebp
+			fld     [ebp]CCamera.m_horizontalAccel
+			fld     [ebp]CCamera.m_verticalAccel
+			rep		stosd
+			fstp	[ebp]CCamera.m_verticalAccel
+			fstp	[ebp]CCamera.m_horizontalAccel
+			ret
+		}
+	}
+
+	static void (__thiscall *orgCtorCameraInit)(CCamera* obj);
+	static void __fastcall CtorCameraInit_InitSensitivity(CCamera* obj)
+	{
+		obj->m_horizontalAccel = DefaultHorizontalAccel;
+		obj->m_verticalAccel = DefaultVerticalAccel;
+		orgCtorCameraInit(obj);
 	}
 }
 
@@ -1751,11 +1771,6 @@ void Patch_III_10(uint32_t width, uint32_t height)
 	// BOOOOORING fixed
 	Patch<BYTE>(0x4925D7, 10);
 
-	// 1.1 mouse sensitivity not resetting fix
-	Patch<WORD>(0x46BE81, 0x12EB);
-	Nop(0x46BAD6, 4);
-	InjectHook(0x46BADA, III_SensResetFix, HookType::Call);
-
 	// (Hopefully) more precise frame limiter
 	ReadCall( 0x582EFD, RsEventHandler );
 	InjectHook(0x582EFD, NewFrameRender);
@@ -1985,6 +2000,27 @@ void Patch_III_Common()
 	using namespace Memory;
 	using namespace hook::txn;
 
+
+	// Don't reset mouse sensitivity on New Game
+	try
+	{
+		using namespace MouseSensNewGame;
+
+		auto camera_init_start = pattern("B9 76 3A 00 00 89 EF F3 AB").get_one();
+		auto camera_init_end = pattern("C7 85 94 01 00 00 ? ? ? ? C7 85 98 01 00 00").get_one();
+		auto camera_ctor_init = get_pattern("8B 4C 24 04 E8 ? ? ? ? 8B 44 24 04 68", 4);
+
+		DefaultHorizontalAccel = *camera_init_end.get<float>(6);
+		DefaultVerticalAccel = *camera_init_end.get<float>(10 + 6);
+
+		Nop(camera_init_start.get<void>(), 4);
+		InjectHook(camera_init_start.get<void>(4), CameraInit_KeepSensitivity, HookType::Call);
+
+		Nop(camera_init_end.get<void>(), 20);
+
+		InterceptCall(camera_ctor_init, orgCtorCameraInit, CtorCameraInit_InitSensitivity);
+	}
+	TXN_CATCH();
 
 	// New timers fix
 	try

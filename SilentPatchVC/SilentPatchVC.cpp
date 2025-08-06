@@ -1051,11 +1051,11 @@ namespace MouseSensNewGame
 	static float DefaultHorizontalAccel;
 	static float* fMouseAccelHorzntl;
 
-	static void (*orgSetDirMyDocuments)();
-	static void SetDirMyDocuments_ResetMouse()
+	static void (__thiscall *orgCtorCameraInit)(void* obj);
+	static void __fastcall CtorCameraInit_InitSensitivity(void* obj)
 	{
-		orgSetDirMyDocuments();
 		*fMouseAccelHorzntl = DefaultHorizontalAccel;
+		orgCtorCameraInit(obj);
 	}
 }
 
@@ -2705,14 +2705,14 @@ void Patch_VC_Common()
 	{
 		using namespace MouseSensNewGame;
 
-		auto cameraInit = pattern("C7 85 14 09 00 00 00 00 00 00 C7 05 ? ? ? ? ? ? ? ? C7 05").get_one();
-		auto setDirMyDocuments = get_pattern("89 CD E8 ? ? ? ? 68", 2);
+		auto camera_init = pattern("C7 85 14 09 00 00 00 00 00 00 C7 05 ? ? ? ? ? ? ? ? C7 05").get_one();
+		auto camera_ctor_init = get_pattern("E8 ? ? ? ? 68 ? ? ? ? 68 ? ? ? ? FF 74 24 0C");
 
-		DefaultHorizontalAccel = *cameraInit.get<float>(20 + 2 + 4);
-		fMouseAccelHorzntl = *cameraInit.get<float*>(20 + 2);
+		DefaultHorizontalAccel = *camera_init.get<float>(20 + 2 + 4);
+		fMouseAccelHorzntl = *camera_init.get<float*>(20 + 2);
 
-		Nop(cameraInit.get<void>(20), 10);
-		InterceptCall(setDirMyDocuments, orgSetDirMyDocuments, SetDirMyDocuments_ResetMouse);
+		Nop(camera_init.get<void>(20), 10);
+		InterceptCall(camera_ctor_init, orgCtorCameraInit, CtorCameraInit_InitSensitivity);
 	}
 	TXN_CATCH();
 
