@@ -1696,6 +1696,7 @@ namespace HierarchyTypoFix
 	// Must be sorted by second parameter
 	constexpr std::pair<const char*, const char*> typosAndFixes[] = {
 		{ "boat_moving_hi", "boat_moving" },
+		{ "elevator_r", "elevator" },
 		{ "misc_a", "misca" },
 		{ "misc_b", "miscb" },
 		{ "taillights", "tailights" },
