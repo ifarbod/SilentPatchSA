@@ -206,8 +206,11 @@ public:
 class NOVMT CClumpModelInfo : public CBaseModelInfo
 {
 public:
-	int						nAnimIndex;
-
+	union
+	{
+		const char*					m_animFileName;
+		int32_t						m_animFileIndex;
+	};
 public:
 	virtual unsigned char			GetModelType() override { return 5; }
 	virtual void					Init() override;
@@ -217,7 +220,7 @@ public:
 	virtual RpAtomic*				CreateInstance() override;
 	virtual void					SetAnimFile(const char* pName) override;
 	virtual void					ConvertAnimFileIndex() override;
-	virtual int						GetAnimFileIndex() override { return nAnimIndex; }
+	virtual int						GetAnimFileIndex() override { return m_animFileIndex; }
 	virtual CColModel*				GetBoundingBox() { return pColModel; }
 	virtual void					SetClump(RpClump* pClump);
 };
@@ -234,7 +237,7 @@ public:
 	char					field_30;
 	signed char				m_nPlateType;
 	char					m_nGameName[8];
-	unsigned int			m_dwType;
+	unsigned int			m_nVehicleType;
 	float					m_fWheelSizeFront;
 	float					m_fWheelSizeRear;
 	unsigned short			m_wWheelModelId;
@@ -292,7 +295,11 @@ public:
 	signed char				m_nQuaternaryColor;
 	short					m_awUpgrades[18];
 	FLAUtils::int16			m_awRemapTxds[4];
-	class CAnimBlock*		m_pAnimBlock;
+	union
+	{
+		const char*			m_animFileName;
+		int32_t				m_animFileIndex;
+	};
 
 public:
 	static int8_t*			ms_compsUsed;

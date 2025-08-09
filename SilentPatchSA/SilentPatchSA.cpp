@@ -339,13 +339,14 @@ struct RsGlobalType
 
 // Other wrappers
 void					(*GTAdelete)(void*) = AddressByVersion<void(*)(void*)>(0x82413F, 0x824EFF, 0x85E58C);
-const char*				(*GetFrameNodeName)(RwFrame*) = AddressByVersion<const char*(*)(RwFrame*)>(0x72FB30, 0x730360, 0x769C20);
+const char*				(*GetFrameNodeName)(RwFrame*) = AddressByVersion<const char*(*)(RwFrame*)>(0x72FB30, 0x730360, 0x769C20, { "55 8B EC A1 ? ? ? ? 85 C0 7E 05 03 45 08 5D C3", 0 });
 RpHAnimHierarchy*		(*GetAnimHierarchyFromSkinClump)(RpClump*) = AddressByVersion<RpHAnimHierarchy*(*)(RpClump*)>(0x734A40, 0x735270, 0x7671B0);	
 auto					InitializeUtrax = AddressByVersion<void(__thiscall*)(void*)>(0x4F35B0, 0x4F3A10, 0x4FFA80);
 auto					RpAnimBlendClumpGetAssociation = AddressByVersion<void*(*)(RpClump*, uint32_t)>(0x4D68B0, { "8B 0D ? ? ? ? 8B 14 01 8B 02 85 C0 74 11 8B 4D 0C", -6 });
-auto					GetAnimationBlockIndex = AddressByVersion<int32_t(*)(const char* animBlock)>(0x4D3990, { "83 C4 04 85 C0 75 05", -0xC });
+auto					GetAnimationBlockIndex = AddressByVersion<int32_t(*)(const char* animBlock)>(0x4D3990, 0x4D3B80, 0x4DE2F0, { "83 C4 04 85 C0 75 05", -0xC });
 auto					RequestModel = AddressByVersion<void(*)(int modelID, int priority)>(0x4087E0, { "57 8D 3C 9B", -0x8 });
 auto					LoadAllRequestedModels = AddressByVersion<void(*)(bool bBlock)>(0x40EA10, { "A1 ? ? ? ? 03 C0", -0x20 });
+auto					ClearAtomicFlag = AddressByVersion<void(*)(RpAtomic*, int)>(0x732310, 0x732B40, 0x76C4B0, { "55 8B EC 8B 55 0C A1", 0 });
 
 auto					IsPlayerOnAMission = AddressByVersion<bool(*)()>(0x464D50, {"85 C0 74 0C 83 B8 ? ? ? ? ? 75 03 B0 01 C3", -5});
 
@@ -372,7 +373,6 @@ CZoneInfo*&				pCurrZoneInfo = **AddressByVersion<CZoneInfo***>(0x58ADB1, 0x58B5
 CRGBA*					HudColour = *AddressByVersion<CRGBA**>(0x58ADF6, 0x58B5C6, 0x440648);
 
 CLinkListSA<CPed*>&			ms_weaponPedsForPC = **AddressByVersion<CLinkListSA<CPed*>**>(0x53EACA, 0x53EF6A, 0x551101);
-CLinkListSA<AlphaObjectInfo>&	m_alphaList = **AddressByVersion<CLinkListSA<AlphaObjectInfo>**>(0x733A4D, 0x73427D, 0x76DCA3);
 
 uint32_t&				bDrawCrossHair = **AddressByVersion<uint32_t**>(0x58E7BF + 2, {"83 3D ? ? ? ? ? 74 29", 2});
 
@@ -392,57 +392,107 @@ static struct
 
 static bool IgnoresWeaponPedsForPCFix();
 
-// Regular functions
-static RpAtomic* RenderAtomic(RpAtomic* pAtomic, float fComp)
+// ============= Fixed atomic render functions for blurred rotors/propellers =============
+namespace BlurredRotorsAtomicRender
 {
-	UNREFERENCED_PARAMETER(fComp);
-	return AtomicDefaultRenderCallBack(pAtomic);
+	template<std::size_t Index>
+	static RpAtomic* (*orgAtomicDefaultRenderCallback)(RpAtomic* pAtomic);
+
+	template<std::size_t Index>
+	static RpAtomic* AtomicDefaultRenderCallBack_HeliRotor(RpAtomic* pAtomic)
+	{
+		RwScopedRenderState<rwRENDERSTATEALPHATESTFUNCTIONREF> alphaRef;
+		RwScopedRenderState<rwRENDERSTATEVERTEXALPHAENABLE> vertexAlpha;
+
+		RwRenderStateSet(rwRENDERSTATEALPHATESTFUNCTIONREF, 0);
+		RwRenderStateSet(rwRENDERSTATEVERTEXALPHAENABLE, reinterpret_cast<void*>(TRUE));
+		return orgAtomicDefaultRenderCallback<Index>(pAtomic);
+	}
+
+	template<std::size_t Index>
+	RpAtomic* AtomicDefaultRenderCallBack_PlaneProp(RpAtomic* pAtomic)
+	{
+		RwScopedRenderState<rwRENDERSTATEALPHATESTFUNCTIONREF> alphaRef;
+		RwScopedRenderState<rwRENDERSTATEVERTEXALPHAENABLE> vertexAlpha;
+
+		if (strstr(GetFrameNodeName(RpAtomicGetFrame(pAtomic)), "_prop") != nullptr)
+		{
+			RwRenderStateSet(rwRENDERSTATEALPHATESTFUNCTIONREF, 0);
+			RwRenderStateSet(rwRENDERSTATEVERTEXALPHAENABLE, reinterpret_cast<void*>(TRUE));
+		}
+
+		return orgAtomicDefaultRenderCallback<Index>(pAtomic);
+	}
+
+	// Both hooks share orgAtomicDefaultRenderCallback, so give them a counter
+	HOOK_EACH_INIT_CTR(HeliRotor, 0, orgAtomicDefaultRenderCallback, AtomicDefaultRenderCallBack_HeliRotor);
+	HOOK_EACH_INIT_CTR(PlaneProp, 1, orgAtomicDefaultRenderCallback, AtomicDefaultRenderCallBack_PlaneProp);
+
+	static RpAtomic* (*RenderVehicleHiDetailAlphaCB_BigVehicle)(RpAtomic*);
+
+	static RpAtomic* (*orgSetAtomicRendererCB_BigVehicle)(RpAtomic*, void*);
+	static RpAtomic* SetAtomicRendererCB_PlaneOrBigVehicle(RpAtomic* atomic, void* data)
+	{
+		RpAtomic* result = orgSetAtomicRendererCB_BigVehicle(atomic, data);
+
+		// We do our setup after, not before the game, to override the original decision
+		if (strstr(GetFrameNodeName(RpAtomicGetFrame(atomic)), "_prop") != nullptr)
+		{
+			RpAtomicSetRenderCallBack(atomic, RenderVehicleHiDetailAlphaCB_BigVehicle);
+		}
+
+		return result;
+	}
+
+	static RpAtomic* (*RenderHeliRotorAlphaCB)(RpAtomic*);
+	static RpAtomic* (*RenderHeliTailRotorAlphaCB)(RpAtomic*);
+
+	static RpAtomic* (*orgSetAtomicRendererCB_RealHeli)(RpAtomic*, void*);
+	static RpAtomic* SetAtomicRendererCB_RealHeli_StaticRotor(RpAtomic* atomic, void* data)
+	{
+		RpAtomic* result = orgSetAtomicRendererCB_RealHeli(atomic, data);
+
+		// We do our setup after, not before the game, to override the original decision
+		const char* frameName = GetFrameNodeName(RpAtomicGetFrame(atomic));
+		if (strcmp(frameName, "static_rotor") == 0)
+		{
+			RpAtomicSetRenderCallBack(atomic, RenderHeliRotorAlphaCB);
+		}
+		else if (strcmp(frameName, "static_rotor2") == 0)
+		{
+			RpAtomicSetRenderCallBack(atomic, RenderHeliTailRotorAlphaCB);
+		}
+
+		return result;
+	}
 }
 
-static RpAtomic* StaticPropellerRender(RpAtomic* pAtomic)
+// ============= Hunter door render flag fix (interior no longer vanishing when looking at it from the right side) =============
+namespace HunterDoorRenderFlagFix
 {
-	RwScopedRenderState<rwRENDERSTATEALPHATESTFUNCTIONREF> alphaRef;
+	static void (__thiscall *orgPreprocessHierarchy)(CVehicleModelInfo* modelInfo);
+	static void __fastcall PreprocessHierarchy_UnmarkHunterDoor(CVehicleModelInfo* modelInfo)
+	{
+		orgPreprocessHierarchy(modelInfo);
 
-	RwRenderStateSet(rwRENDERSTATEALPHATESTFUNCTIONREF, 0);
-	pAtomic = AtomicDefaultRenderCallBack(pAtomic);
-
-	return pAtomic;
-}
-
-static RpAtomic* MovingPropellerRender(RpAtomic* pAtomic)
-{
-	RwScopedRenderState<rwRENDERSTATEALPHATESTFUNCTIONREF> alphaRef;
-	RwScopedRenderState<rwRENDERSTATEVERTEXALPHAENABLE> vertexAlpha;
-
-	RwRenderStateSet(rwRENDERSTATEALPHATESTFUNCTIONREF, 0);
-	RwRenderStateSet(rwRENDERSTATEVERTEXALPHAENABLE, reinterpret_cast<void*>(TRUE));
-	pAtomic = AtomicDefaultRenderCallBack(pAtomic);
-
-	return pAtomic;
-}
-
-RpAtomic* RenderBigVehicleActomic(RpAtomic* pAtomic, float)
-{
-	const char*		pNodeName = GetFrameNodeName(RpAtomicGetFrame(pAtomic));
-
-	if ( strncmp(pNodeName, "moving_prop", 11) == 0 )
-		return MovingPropellerRender(pAtomic);
-
-	if ( strncmp(pNodeName, "static_prop", 11) == 0 )
-		return StaticPropellerRender(pAtomic);
-
-	return AtomicDefaultRenderCallBack(pAtomic);
-}
-
-void RenderVehicleHiDetailAlphaCB_HunterDoor(RpAtomic* pAtomic)
-{
-	AlphaObjectInfo		NewObject;
-
-	NewObject.callback = RenderAtomic;
-	NewObject.fCompareValue = -std::numeric_limits<float>::infinity();
-	NewObject.pAtomic = pAtomic;
-
-	m_alphaList.InsertFront(NewObject);
+		// We unmark the left front door for all vehicles using Rustler's animations, i.e. door opening to the top
+		const int VehicleAnimFileIndex = modelInfo->GetAnimFileIndex();
+		if (VehicleAnimFileIndex != -1)
+		{
+			static const int RustlerAnimFileIndex = GetAnimationBlockIndex("rustler");
+			if (VehicleAnimFileIndex == RustlerAnimFileIndex)
+			{
+				RpClumpForAllAtomics(reinterpret_cast<RpClump*>(modelInfo->pRwObject), [](RpAtomic* atomic) -> RpAtomic*
+					{
+						if (strncmp(GetFrameNodeName(RpAtomicGetFrame(atomic)), "door_lf", 7) == 0)
+						{
+							ClearAtomicFlag(atomic, 4); // ATOMIC_IS_LEFT
+						}
+						return atomic;
+					});
+			}
+		}
+	}
 }
 
 void RenderWeapon(CPed* pPed)
@@ -3567,143 +3617,13 @@ __declspec(naked) void UserTracksFix_Steam()
 	}
 }
 
-static void*	PlaneAtomicRendererSetup_JumpBack = AddressByVersion<void*>(0x4C7986, 0x4C7A06, 0x4D2275);
-static void*	RenderVehicleHiDetailAlphaCB_BigVehicle = AddressByVersion<void*>(0x734370, 0x734BA0, 0x76E400);
-static void*	RenderVehicleHiDetailCB_BigVehicle = AddressByVersion<void*>(0x733420, 0x733C50, 0x76D6C0);
-__declspec(naked) void PlaneAtomicRendererSetup()
-{
-	static const char	aStaticProp[] = "static_prop";
-	static const char	aMovingProp[] = "moving_prop";
-	_asm
-	{
-		mov     eax, [esi+4]
-		push	eax
-		call	GetFrameNodeName
-		mov		[esp+8+8], eax
-		push	11
-		push	offset aStaticProp
-		push	eax
-		call	strncmp
-		add		esp, 0x10
-		test	eax, eax
-		jz		PlaneAtomicRendererSetup_Alpha
-		push	11
-		push	offset aMovingProp
-		push	[esp+12+8]
-		call	strncmp
-		add		esp, 0xC
-		test	eax, eax
-		jnz		PlaneAtomicRendererSetup_NoAlpha
-
-	PlaneAtomicRendererSetup_Alpha:
-		push	RenderVehicleHiDetailAlphaCB_BigVehicle
-		jmp		PlaneAtomicRendererSetup_Return
-
-	PlaneAtomicRendererSetup_NoAlpha:
-		push	RenderVehicleHiDetailCB_BigVehicle
-
-	PlaneAtomicRendererSetup_Return:
-		jmp		PlaneAtomicRendererSetup_JumpBack
-	}
-}
-
-static unsigned int		nCachedCRC;
-
-static void*	RenderVehicleHiDetailCB = AddressByVersion<void*>(0x733240, 0x733A70, 0x76D4C0);
-static void*	RenderVehicleHiDetailAlphaCB = AddressByVersion<void*>(0x733F80, 0x7347B0, 0x76DFE0);
-static void*	RenderHeliRotorAlphaCB = AddressByVersion<void*>(0x7340B0, 0x7348E0, 0x76E110);
-static void*	RenderHeliTailRotorAlphaCB = AddressByVersion<void*>(0x734170, 0x7349A0, 0x76E1E0);
-static void*	HunterTest_JumpBack = AddressByVersion<void*>(0x4C7914, 0x4C7994, 0x4D2203);
-
-// strcmp can't be invoked from inline assembly block?
-static int strcmp_wrap(const char *s1, const char *s2)
-{
-	return strcmp( s1, s2 );
-}
-
-__declspec(naked) void HunterTest()
-{
-	static const char	aDoorDummy[] = "door_lf_ok";
-	static const char	aStaticRotor[] = "static_rotor";
-	static const char	aStaticRotor2[] = "static_rotor2";
-	static const char	aWindscreen[] = "windscreen";
-	_asm
-	{
-		setnz	al
-		movzx	di, al
-
-		push	10
-		push	offset aWindscreen
-		push	ebp
-		call	strncmp
-		add		esp, 0xC
-		test	eax, eax
-		jz		HunterTest_RegularAlpha
-
-		push	offset aStaticRotor2
-		push	ebp
-		call	strcmp_wrap
-		add		esp, 8
-		test	eax, eax
-		jz		HunterTest_StaticRotor2AlphaSet
-
-		push	offset aStaticRotor
-		push	ebp
-		call	strcmp_wrap
-		add		esp, 8
-		test	eax, eax
-		jz		HunterTest_StaticRotorAlphaSet
-
-		test	di, di
-		jnz		HunterTest_DoorTest
-
-		push	RenderVehicleHiDetailCB
-		jmp		HunterTest_JumpBack
-
-	HunterTest_DoorTest:
-		cmp		nCachedCRC, 0x45D0B41C
-		jnz		HunterTest_RegularAlpha
-		push	offset aDoorDummy
-		push	ebp
-		call	strcmp_wrap
-		add		esp, 8
-		test	eax, eax
-		jnz		HunterTest_RegularAlpha
-		push	RenderVehicleHiDetailAlphaCB_HunterDoor
-		jmp		HunterTest_JumpBack
-
-	HunterTest_RegularAlpha:
-		push	RenderVehicleHiDetailAlphaCB
-		jmp		HunterTest_JumpBack
-
-	HunterTest_StaticRotorAlphaSet:
-		push	RenderHeliRotorAlphaCB
-		jmp		HunterTest_JumpBack
-
-	HunterTest_StaticRotor2AlphaSet:
-		push	RenderHeliTailRotorAlphaCB
-		jmp		HunterTest_JumpBack
-	}
-}
- 
-static void*	CacheCRC32_JumpBack = AddressByVersion<void*>(0x4C7B10, 0x4C7B90, 0x4D2400);
-__declspec(naked) void CacheCRC32()
-{
-	_asm
-	{
-		mov		eax, [ecx+4]
-		mov		nCachedCRC, eax
-		jmp		CacheCRC32_JumpBack
-	}
-}
-
 static void* const TrailerDoubleRWheelsFix_ReturnFalse = AddressByVersion<void*>(0x4C9333, 0x4C9533, 0x4D3C59);
 static void* const TrailerDoubleRWheelsFix_ReturnTrue = AddressByVersion<void*>(0x4C9235, 0x4C9435, 0x4D3B59);
 __declspec(naked) void TrailerDoubleRWheelsFix()
 {
 	_asm
 	{
-		cmp		[edi]CVehicleModelInfo.m_dwType, VEHICLE_TRAILER
+		cmp		[edi]CVehicleModelInfo.m_nVehicleType, VEHICLE_TRAILER
 		je		TrailerDoubleRWheelsFix_DoWheels
 		cmp		eax, 2
 		je		TrailerDoubleRWheelsFix_False
@@ -3733,7 +3653,7 @@ __declspec(naked) void TrailerDoubleRWheelsFix_Steam()
 {
 	_asm
 	{
-		cmp		[esi]CVehicleModelInfo.m_dwType, VEHICLE_TRAILER
+		cmp		[esi]CVehicleModelInfo.m_nVehicleType, VEHICLE_TRAILER
 		je		TrailerDoubleRWheelsFix_DoWheels
 		cmp		eax, 2
 		je		TrailerDoubleRWheelsFix_False
@@ -4270,11 +4190,36 @@ BOOL InjectDelayedPatches_10()
 		
 		if ( !bSARender )
 		{
-			// Twopass rendering (experimental)
-			Patch<const void*>(0x7341D9, MovingPropellerRender);
-			Patch<const void*>(0x734127, MovingPropellerRender);
-			Patch(0x73445E, RenderBigVehicleActomic);
+			// Alpha render states on rotors and propellers
+			using namespace BlurredRotorsAtomicRender;
 
+			auto PatchRenderCB = [](uintptr_t address, bool fallback, RpAtomic*(*&org)(RpAtomic*), RpAtomic*(&replaced)(RpAtomic*))
+				{
+					if (!fallback)
+					{
+						org = *((RpAtomic*(**)(RpAtomic*))address);
+						Patch(address, &replaced);
+					}
+					else
+					{
+						InterceptCall(address, org, replaced);
+					}
+				};
+
+			std::array<std::pair<uintptr_t, bool>, 4> heli_rotor_render = { {
+				{ 0x7341D9, false },
+				{ 0x73421D, true },
+				{ 0x734127, false },
+				{ 0x73414D, true },
+			} };
+
+			std::array<std::pair<uintptr_t, bool>, 2> plane_prop_render = { {
+				{ 0x73445E, false },
+				{ 0x73448C, true },
+			} };
+
+			HookEach_HeliRotor(heli_rotor_render, PatchRenderCB);
+			HookEach_PlaneProp(plane_prop_render, PatchRenderCB);
 
 			// Weapons rendering
 			if ( !bOutfit )
@@ -4868,10 +4813,36 @@ BOOL InjectDelayedPatches_11()
 
 		if ( !bSARender )
 		{
-			// Twopass rendering (experimental)
-			Patch<const void*>(0x734A09, MovingPropellerRender);
-			Patch<const void*>(0x734957, MovingPropellerRender);
-			Patch(0x734C8E, RenderBigVehicleActomic);
+			// Alpha render states on rotors and propellers
+			using namespace BlurredRotorsAtomicRender;
+
+			auto PatchRenderCB = [](uintptr_t address, bool fallback, RpAtomic*(*&org)(RpAtomic*), RpAtomic*(&replaced)(RpAtomic*))
+				{
+					if (!fallback)
+					{
+						org = *((RpAtomic*(**)(RpAtomic*))address);
+						Patch(address, &replaced);
+					}
+					else
+					{
+						InterceptCall(address, org, replaced);
+					}
+				};
+
+			std::array<std::pair<uintptr_t, bool>, 4> heli_rotor_render = { {
+				{ 0x734A09, false },
+				{ 0x734A4D, true },
+				{ 0x734957, false },
+				{ 0x73497D, true },
+			} };
+
+			std::array<std::pair<uintptr_t, bool>, 2> plane_prop_render = { {
+				{ 0x734C8E, false },
+				{ 0x734CBC, true },
+			} };
+
+			HookEach_HeliRotor(heli_rotor_render, PatchRenderCB);
+			HookEach_PlaneProp(plane_prop_render, PatchRenderCB);
 
 			// Weapons rendering
 			if ( !bOutfit )
@@ -5042,10 +5013,36 @@ BOOL InjectDelayedPatches_Steam()
 
 		if ( !bSARender )
 		{
-			// Twopass rendering (experimental)
-			Patch<const void*>(0x76E230, MovingPropellerRender);
-			Patch<const void*>(0x76E160, MovingPropellerRender);
-			Patch(0x76E4F0, RenderBigVehicleActomic);
+			// Alpha render states on rotors and propellers
+			using namespace BlurredRotorsAtomicRender;
+
+			auto PatchRenderCB = [](uintptr_t address, bool fallback, RpAtomic*(*&org)(RpAtomic*), RpAtomic*(&replaced)(RpAtomic*))
+				{
+					if (!fallback)
+					{
+						org = *((RpAtomic*(**)(RpAtomic*))address);
+						Patch(address, &replaced);
+					}
+					else
+					{
+						InterceptCall(address, org, replaced);
+					}
+				};
+
+			std::array<std::pair<uintptr_t, bool>, 4> heli_rotor_render = { {
+				{ 0x76E230, false },
+				{ 0x76E2B1, true },
+				{ 0x76E160, false },
+				{ 0x76E1C1, true },
+			} };
+
+			std::array<std::pair<uintptr_t, bool>, 2> plane_prop_render = { {
+				{ 0x76E4F0, false },
+				{ 0x76E51F, true },
+			} };
+
+			HookEach_HeliRotor(heli_rotor_render, PatchRenderCB);
+			HookEach_PlaneProp(plane_prop_render, PatchRenderCB);
 
 
 			// Weapons rendering
@@ -5439,8 +5436,15 @@ void Patch_SA_10(HINSTANCE hInstance)
 	Patch<const void*>(0x6FB97A, &pRefFal);
 	Patch<BYTE>(0x6FB9A0, 0);
 
-	// Plane rotors
-	InjectHook(0x4C7981, PlaneAtomicRendererSetup, HookType::Jump);
+	// Proper alpha handling for plane propellers
+	{
+		using namespace BlurredRotorsAtomicRender;
+	
+		RenderVehicleHiDetailAlphaCB_BigVehicle = *(decltype(RenderVehicleHiDetailAlphaCB_BigVehicle)*)(0x4C797A + 1);
+
+		orgSetAtomicRendererCB_BigVehicle = *(decltype(orgSetAtomicRendererCB_BigVehicle)*)(0x4C7B76 + 1);
+		Patch(0x4C7B76 + 1, &SetAtomicRendererCB_PlaneOrBigVehicle);
+	}
 
 	// DOUBLE_RWHEELS
 	Patch<WORD>(0x4C9290, 0xE281);
@@ -5463,9 +5467,23 @@ void Patch_SA_10(HINSTANCE hInstance)
 	// Make sure DirectInput mouse device is set non-exclusive (may not be needed?)
 	Patch<DWORD>(AddressByRegion_10<DWORD>(0x7469A0), 0x9090C030);
 
-	// Hunter interior & static_rotor for helis
-	InjectHook(0x4C78F2, HunterTest, HookType::Jump);
-	InjectHook(0x4C9618, CacheCRC32);
+	// Proper alpha handling for plane propellers
+	{
+		using namespace BlurredRotorsAtomicRender;
+
+		RenderHeliRotorAlphaCB = *(decltype(RenderHeliRotorAlphaCB)*)(0x4C7898 + 1);
+		RenderHeliTailRotorAlphaCB = *(decltype(RenderHeliTailRotorAlphaCB)*)(0x4C78B1 + 1);
+
+		orgSetAtomicRendererCB_RealHeli = *(decltype(orgSetAtomicRendererCB_RealHeli)*)(0x4C7B53 + 1);
+		Patch(0x4C7B53 + 1, &SetAtomicRendererCB_RealHeli_StaticRotor);
+	}
+
+	// Hunter door render flag fix (interior no longer vanishing when looking at it from the right side)
+	{
+		using namespace HunterDoorRenderFlagFix;
+
+		InterceptCall(0x4C9638, orgPreprocessHierarchy, PreprocessHierarchy_UnmarkHunterDoor);
+	}
 
 	// Fixed blown up car rendering
 	// ONLY 1.0
@@ -6578,8 +6596,15 @@ void Patch_SA_11()
 	Patch<const void*>(0x6FC1AA, &pRefFal);
 	Patch<BYTE>(0x6FC1D0, 0);
 
-	// Plane rotors
-	InjectHook(0x4C7A01, PlaneAtomicRendererSetup, HookType::Jump);
+	// Proper alpha handling for plane propellers
+	{
+		using namespace BlurredRotorsAtomicRender;
+
+		RenderVehicleHiDetailAlphaCB_BigVehicle = *(decltype(RenderVehicleHiDetailAlphaCB_BigVehicle)*)(0x4C79FA + 1);
+
+		orgSetAtomicRendererCB_BigVehicle = *(decltype(orgSetAtomicRendererCB_BigVehicle)*)(0x46B1C5 + 1);
+		Patch(0x46B1C5 + 1, &SetAtomicRendererCB_PlaneOrBigVehicle);
+	}
 
 	// DOUBLE_RWHEELS
 	Patch<WORD>(0x4C9490, 0xE281);
@@ -6602,9 +6627,12 @@ void Patch_SA_11()
 	// Make sure DirectInput mouse device is set non-exclusive (may not be needed?)
 	Patch<DWORD>(AddressByRegion_11<DWORD>(0x747270), 0x9090C030);
 
-	// Hunter interior & static_rotor for helis
-	InjectHook(0x4C7972, HunterTest, HookType::Jump);
-	InjectHook(0x4C9818, CacheCRC32);
+	// Hunter door render flag fix (interior no longer vanishing when looking at it from the right side)
+	{
+		using namespace HunterDoorRenderFlagFix;
+
+		InterceptCall(0x04C9838, orgPreprocessHierarchy, PreprocessHierarchy_UnmarkHunterDoor);
+	}
 
 	// Lightbeam fix
 	// Removed in Build 30 because the fix has been revisited
@@ -6922,8 +6950,15 @@ void Patch_SA_Steam()
 	Patch<const void*>(0x733FF0, &pRefFal);
 	Patch<BYTE>(0x73401A, 0);
 
-	// Plane rotors
-	InjectHook(0x4D2270, PlaneAtomicRendererSetup, HookType::Jump);
+	// Proper alpha handling for plane propellers
+	{
+		using namespace BlurredRotorsAtomicRender;
+
+		RenderVehicleHiDetailAlphaCB_BigVehicle = *(decltype(RenderVehicleHiDetailAlphaCB_BigVehicle)*)(0x4D2269 + 1);
+
+		orgSetAtomicRendererCB_BigVehicle = *(decltype(orgSetAtomicRendererCB_BigVehicle)*)(0x4D2466 + 1);
+		Patch(0x4D2466 + 1, &SetAtomicRendererCB_PlaneOrBigVehicle);
+	}
 
 	// DOUBLE_RWHEELS
 	Patch<WORD>(0x4D3B9D, 0x6781);
@@ -6946,9 +6981,12 @@ void Patch_SA_Steam()
 	// Make sure DirectInput mouse device is set non-exclusive (may not be needed?)
 	Patch<DWORD>(0x7807D0, 0x9090C030);
 
-	// Hunter interior & static_rotor for helis
-	InjectHook(0x4D21E1, HunterTest, HookType::Jump);
-	InjectHook(0x4D3F1D, CacheCRC32);
+	// Hunter door render flag fix (interior no longer vanishing when looking at it from the right side)
+	{
+		using namespace HunterDoorRenderFlagFix;
+
+		InterceptCall(0x4D396D, orgPreprocessHierarchy, PreprocessHierarchy_UnmarkHunterDoor);
+	}
 
 	// Bindable NUM5
 	// Only 1.0 and Steam
@@ -8717,6 +8755,18 @@ void Patch_SA_NewBinaries_Common(HINSTANCE hInstance)
 		auto loadVehicleModelSscanf = get_pattern("52 68 ? ? ? ? 50 E8 ? ? ? ? 8B 4D E0 51", 7);
 
 		InterceptCall(loadVehicleModelSscanf, orgSscanf, sscanf_Defaults);
+	}
+	TXN_CATCH();
+
+
+	// Hunter door render flag fix (interior no longer vanishing when looking at it from the right side)
+	try
+	{
+		using namespace HunterDoorRenderFlagFix;
+
+		auto preprocess_hierarchy = get_pattern("E8 ? ? ? ? 8B CE E8 ? ? ? ? B0 FF");
+
+		InterceptCall(preprocess_hierarchy, orgPreprocessHierarchy, PreprocessHierarchy_UnmarkHunterDoor);
 	}
 	TXN_CATCH();
 }
