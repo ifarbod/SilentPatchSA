@@ -6559,6 +6559,11 @@ void Patch_SA_10(HINSTANCE hInstance)
 	}
 
 
+	// Fix the rear van doors not being properly special cased in CCarEnterExit::GetPositionToOpenCarDoor
+	// By B1ack_Wh1te
+	Patch<int8_t>(0x64E77B + 6, 13); // ANIM_VEH_VAN - ANIM_VEH_STD
+
+
 	// Fix jumping on bikes from the front misplacing CJ on the Z axis
 	// By B1ack_Wh1te
 	Patch(0x64FFAD, { 0xD8, 0x64, 0x24 }); // fsub
@@ -8775,6 +8780,17 @@ void Patch_SA_NewBinaries_Common(HINSTANCE hInstance)
 		InterceptCall(preprocess_hierarchy, orgPreprocessHierarchy, PreprocessHierarchy_UnmarkHunterDoor);
 	}
 	TXN_CATCH();
+
+
+	// Fix the rear van doors not being properly special cased in CCarEnterExit::GetPositionToOpenCarDoor
+	// By B1ack_Wh1te
+	try
+	{
+		auto getLocalPositionToOpenCarDoor = get_pattern("80 B9 ? ? ? ? ? 8B 5D 10", 6);
+		Patch<int8_t>(getLocalPositionToOpenCarDoor, 13); // ANIM_VEH_VAN - ANIM_VEH_STD
+	}
+	TXN_CATCH();
+
 
 	// Fix jumping on bikes from the front misplacing CJ on the Z axis
 	// By B1ack_Wh1te
