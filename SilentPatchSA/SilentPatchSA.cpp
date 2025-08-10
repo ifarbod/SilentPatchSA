@@ -6559,6 +6559,11 @@ void Patch_SA_10(HINSTANCE hInstance)
 	}
 
 
+	// Fix jumping on bikes from the front misplacing CJ on the Z axis
+	// By B1ack_Wh1te
+	Patch(0x64FFAD, { 0xD8, 0x64, 0x24 }); // fsub
+
+
 #if FULL_PRECISION_D3D
 	// Test - full precision D3D device
 	Patch<uint8_t>( 0x7F672B+1, *(uint8_t*)(0x7F672B+1) | D3DCREATE_FPU_PRESERVE );
@@ -8768,6 +8773,15 @@ void Patch_SA_NewBinaries_Common(HINSTANCE hInstance)
 		auto preprocess_hierarchy = get_pattern("E8 ? ? ? ? 8B CE E8 ? ? ? ? B0 FF");
 
 		InterceptCall(preprocess_hierarchy, orgPreprocessHierarchy, PreprocessHierarchy_UnmarkHunterDoor);
+	}
+	TXN_CATCH();
+
+	// Fix jumping on bikes from the front misplacing CJ on the Z axis
+	// By B1ack_Wh1te
+	try
+	{
+		auto getLocalPositionToOpenCarDoor = get_pattern("D9 5D DC D9 45 F8 D8 45 EC", 6);
+		Patch(getLocalPositionToOpenCarDoor, { 0xD8, 0x65 }); // fsub
 	}
 	TXN_CATCH();
 }
