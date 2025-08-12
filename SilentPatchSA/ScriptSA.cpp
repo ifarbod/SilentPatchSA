@@ -10,7 +10,7 @@ int32_t* CRunningScript::GetDay_GymGlitch()
 		static int* const StatTypesInt = *AddressByVersion<int**>(0x55C0D8, 0x55C578, 0x574F24);
 
 		Out[0] = -1;
-		Out[1] = StatTypesInt[134-120];
+		Out[1] = StatTypesInt[134-120] + 1;
 	}
 	else
 	{
