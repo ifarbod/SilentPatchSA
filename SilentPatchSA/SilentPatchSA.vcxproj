@@ -245,6 +245,7 @@
     <ClInclude Include="..\SilentPatch\Utils\MemoryMgr.GTA.h" />
     <ClInclude Include="..\SilentPatch\Utils\MemoryMgr.h" />
     <ClInclude Include="..\SilentPatch\Utils\Patterns.h" />
+    <ClInclude Include="AnimationSA.h" />
     <ClInclude Include="AudioHardwareSA.h" />
     <ClInclude Include="FireManagerSA.h" />
     <ClInclude Include="FLACDecoderSA.h" />

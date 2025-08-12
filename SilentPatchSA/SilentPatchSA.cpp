@@ -8,6 +8,7 @@
 #include <ShellAPI.h>
 #include <cinttypes>
 
+#include "AnimationSA.h"
 #include "ScriptSA.h"
 #include "GeneralSA.h"
 #include "ModelInfoSA.h"
@@ -342,7 +343,7 @@ void					(*GTAdelete)(void*) = AddressByVersion<void(*)(void*)>(0x82413F, 0x824E
 const char*				(*GetFrameNodeName)(RwFrame*) = AddressByVersion<const char*(*)(RwFrame*)>(0x72FB30, 0x730360, 0x769C20, { "55 8B EC A1 ? ? ? ? 85 C0 7E 05 03 45 08 5D C3", 0 });
 RpHAnimHierarchy*		(*GetAnimHierarchyFromSkinClump)(RpClump*) = AddressByVersion<RpHAnimHierarchy*(*)(RpClump*)>(0x734A40, 0x735270, 0x7671B0);	
 auto					InitializeUtrax = AddressByVersion<void(__thiscall*)(void*)>(0x4F35B0, 0x4F3A10, 0x4FFA80);
-auto					RpAnimBlendClumpGetAssociation = AddressByVersion<void*(*)(RpClump*, uint32_t)>(0x4D68B0, { "8B 0D ? ? ? ? 8B 14 01 8B 02 85 C0 74 11 8B 4D 0C", -6 });
+auto					RpAnimBlendClumpGetAssociation = AddressByVersion<CAnimBlendAssociation*(*)(RpClump*, uint32_t)>(0x4D68B0, { "8B 0D ? ? ? ? 8B 14 01 8B 02 85 C0 74 11 8B 4D 0C", -6 });
 auto					GetAnimationBlockIndex = AddressByVersion<int32_t(*)(const char* animBlock)>(0x4D3990, 0x4D3B80, 0x4DE2F0, { "83 C4 04 85 C0 75 05", -0xC });
 auto					RequestModel = AddressByVersion<void(*)(int modelID, int priority)>(0x4087E0, { "57 8D 3C 9B", -0x8 });
 auto					LoadAllRequestedModels = AddressByVersion<void(*)(bool bBlock)>(0x40EA10, { "A1 ? ? ? ? 03 C0", -0x20 });
@@ -2152,17 +2153,61 @@ namespace QuadbikeHandlebarAnims
 }
 
 
-// ======= Disable the radio station change anim on boats where CJ stands upright =======
-namespace UprightBoatRadioStationChange
+// ======= Modify the radio station change anim to only affect the right hand, and disable it on the Kart =======
+namespace RadioStationChangeAnimBlending
 {
-	static void* (*orgAnimManagerBlendAnimation)(RpClump*, uint32_t, uint32_t, float);
-	void* AnimManagerBlendAnimation_SkipIfBoatDrive(RpClump* clump, uint32_t assocGroupId, uint32_t animationId, float rate)
+	// Disable all bones but the right hand and arm, and head/neck, so the animation looks better on different vehicles
+	static CAnimBlendAssociation* DisableBones(CAnimBlendAssociation* animAssociation, bool bDisablePartial)
 	{
-		if (RpAnimBlendClumpGetAssociation(clump, 81) != nullptr) // ANIM_STD_BOAT_DRIVE
+		if (animAssociation != nullptr)
+		{
+			for (CAnimBlendNode& node : animAssociation->GetNodes())
+			{
+				CAnimBlendSequence* sequence = node.GetSequence();
+				if (sequence != nullptr)
+				{
+					if (sequence->HasBoneTag())
+					{
+						switch (sequence->GetBoneTag())
+						{
+						// Keep only those bones, disable the rest
+						case BONETAG_HEAD:
+						case BONETAG_R_CLAVICLE:
+						case BONETAG_R_UPPERARM:
+						case BONETAG_R_FOREARM:
+						case BONETAG_R_HAND:
+						case BONETAG_R_FINGERS:
+						case BONETAG_R_FINGER01:
+						case BONETAG_R_BREAST:
+							break;
+
+						default:
+							node.SetSequence(nullptr);
+							break;
+						}
+					}
+				}
+			}
+			if (bDisablePartial)
+			{
+				animAssociation->ClearFlag(ABA_FLAG_ISPARTIAL);
+			}
+		}
+
+		return animAssociation;
+	}
+
+	static CAnimBlendAssociation* (*orgAnimManagerBlendAnimation)(RpClump*, uint32_t, uint32_t, float);
+	CAnimBlendAssociation* AnimManagerBlendAnimation_DisableBones(RpClump* clump, uint32_t assocGroupId, uint32_t animationId, float rate)
+	{
+		if (RpAnimBlendClumpGetAssociation(clump, 95) != nullptr) // ANIM_STD_CAR_SIT_KART
 		{
 			return nullptr;
 		}
-		return orgAnimManagerBlendAnimation(clump, assocGroupId, animationId, rate);
+
+		// For the standing animation, disable the partial/additive flag so CJ doesn't reach as far for the knob
+		const bool bIsBoatDrive = RpAnimBlendClumpGetAssociation(clump, 81) != nullptr; // ANIM_STD_BOAT_DRIVE
+		return DisableBones(orgAnimManagerBlendAnimation(clump, assocGroupId, animationId, rate), bIsBoatDrive);
 	}
 };
 
@@ -6180,12 +6225,12 @@ void Patch_SA_10(HINSTANCE hInstance)
 	InjectHook(0x6B7932+1, &QuadbikeHandlebarAnims::ProcessRiderAnims_FixInterp, HookType::Call);
 
 
-	// Disable the radio station change anim on boats where CJ stands upright
-	// By Wesser
+	// Modify the radio station change anim to only affect the right hand, and disable it on the Kart
+	// By Wesser, improved by B1ack_Wh1te
 	{
-		using namespace UprightBoatRadioStationChange;
+		using namespace RadioStationChangeAnimBlending;
 
-		InterceptCall(0x6DF4F4, orgAnimManagerBlendAnimation, AnimManagerBlendAnimation_SkipIfBoatDrive);
+		InterceptCall(0x6DF4F4, orgAnimManagerBlendAnimation, AnimManagerBlendAnimation_DisableBones);
 	}
 
 
@@ -8303,14 +8348,14 @@ void Patch_SA_NewBinaries_Common(HINSTANCE hInstance)
 	TXN_CATCH();
 
 
-	// Disable the radio station change anim on boats where CJ stands upright
-	// By Wesser
+	// Modify the radio station change anim to only affect the right hand, and disable it on the Kart
+	// By Wesser, improved by B1ack_Wh1te
 	try
 	{
-		using namespace UprightBoatRadioStationChange;
+		using namespace RadioStationChangeAnimBlending;
 
 		auto blendAnimation = get_pattern("E8 ? ? ? ? 83 C4 10 85 C0 0F 85 ? ? ? ? D9 47 48");
-		InterceptCall(blendAnimation, orgAnimManagerBlendAnimation, AnimManagerBlendAnimation_SkipIfBoatDrive);
+		InterceptCall(blendAnimation, orgAnimManagerBlendAnimation, AnimManagerBlendAnimation_DisableBones);
 	}
 	TXN_CATCH();
 
