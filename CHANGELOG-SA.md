@@ -80,7 +80,8 @@ All the remaining, non-critical fixes.
 * ➕ Steam/RGL versions will now default Steer with Mouse option to disabled, like in 1.0/1.01.
 * ➕ Wind animations now apply to CJ's clothes when driving a Quadbike (contributed by **Wesser**).
 * ➕ Quadbike's handlebar movement now matches CJ's steering animations when driving at low speeds (contributed by **Wesser**).
-* ➕ Fixed the sitting radio station change animation playing in boats where CJ stands upright (contributed by **Wesser**).
+* ➕ Improved the radio station change animation to animate correctly in low vehicles, trucks, and standing boats, and when CJ is using his high Driving Skill animations (contributed by **B1ack_Wh1te**).
+* ➕ Disabled the radio station change animation on the Kart.
 * ➕ Pickups, car generators, and stunt jumps spawned through the text IPL files now reinitialize on a New Game. Most notably, this fixes several pickups (like fire extinguishers) going missing after starting a new game.
 * ➕ Fixed crosshair issues when the sniper rifle is equipped and a photo is taken by a gang member (contributed by **Wesser**).
 * ➕ Fixed an issue where biker cops kept shooting at the player even after losing the wanted level.
@@ -104,10 +105,13 @@ All the remaining, non-critical fixes.
 * ➕ The inner padding of the text boxes with a background now scales to resolution correctly (contributed by **Wesser**).
 * ➕ Nitrous will no longer regenerate faster when reversing the car (contributed by **Wesser**).
 * ➕ Hydra's jet thrusters no longer randomly fail to appear (contributed by **B1ack_Wh1te**).
+* ➕ Hunter's interior does not disappear when viewed through the glass door panel.
+* ➕ CJ no longer sinks inside the bike when jumping on it from the front (contributed by **B1ack_Wh1te**).
+* ➕ Characters entering the back of van vehicles will no longer sligthly teleport when playing the entering animation (contributed by **B1ack_Wh1te**).
 * Detached vehicle parts will now keep the same color and lighting as the vehicle they came from.
 * Detached vehicle parts are now rendered from both sides.
 * Resolved single-pixel wide seams showing on the Map screen with Anti-Aliasing enabled.
-* Several vehicles now have extra animated components: Phoenix hood scoops, Sweeper brushes, Newsvan antenna, radars on several boats, and extra flaps on Stuntplane and Beagle.
+* Several vehicles now have extra animated components: Phoenix hood scoops, Sweeper brushes, Newsvan antenna, radars on several boats, and extra flaps on Stuntplane, Beagle, and Dodo.
 * Animated engine components on Bandito, BF Injection, and Hotknife will not animate if the engine is off.
 * Firetruck (firela variant) now has a functional ladder - it can be raised by moving the right analog stick down/pressing <kbd>Num2</kbd>.
 * artict3 trailers can now be chained (as it was most likely intended since the model has a hook dummy which was not functional until now).
@@ -118,7 +122,6 @@ All the remaining, non-critical fixes.
 * Stats counted in kilograms are now displayed correctly.
 * 16:9 resolutions are now selectable (like in the 1.01 patch).
 * Wet road reflections render properly again (just like with Road Reflections Fix).
-* Hunter's interior does not disappear when viewed through the glass door panel.
 * Weapons are now visible when viewed through a vehicle window.
 * Holding a weapon will not cause some objects to be incorrectly lit anymore.
 * Blown-up vehicles are now correctly colored and no longer shine (like in the 1.01 and Steam versions).
