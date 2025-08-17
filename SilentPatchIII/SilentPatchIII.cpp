@@ -88,12 +88,9 @@ struct RsGlobalType
 
 DebugMenuAPI gDebugMenuAPI;
 
-static void (*DrawRect)(const CRect&,const CRGBA&);
 static int*				InstantHitsFiredByPlayer;
 static const void*		HeadlightsFix_JumpBack;
 
-static bool*			bWantsToDrawHud;
-static bool*			bCamCheck;
 static RsGlobalType*	RsGlobal;
 
 auto 					WorldRemove = reinterpret_cast<void(*)(void*)>(hook::get_pattern("8A 43 50 56 24 07", -5));
@@ -110,25 +107,26 @@ float GetHeightMult()
 	return **ResolutionHeightMult;
 }
 
-void ShowRadarTrace(float fX, float fY, unsigned int nScale, BYTE r, BYTE g, BYTE b, BYTE a)
+// ============= Scale the radar trace (blip) to resolution =============
+namespace RadarTraceScaling
 {
-	if ( *bWantsToDrawHud == true && !*bCamCheck )
+	template<std::size_t Index>
+	static void (*orgDrawRect)(const CRect&,const CRGBA&);
+
+	template<std::size_t Index>
+	static void DrawRect_Scale(const CRect& pos, const CRGBA& color)
 	{
-		float	fWidthMult = GetWidthMult();
-		float	fHeightMult = GetHeightMult();
+		const float x = (pos.x1 + pos.x2) / 2.0f;
+		const float y = (pos.y1 + pos.y2) / 2.0f;
+		const float scale = (pos.x2 - pos.x1) / 2.0f;
 
-		DrawRect(CRect(	fX - ((nScale+1.0f) * fWidthMult * RsGlobal->MaximumWidth),
-						fY + ((nScale+1.0f) * fHeightMult * RsGlobal->MaximumHeight),
-						fX + ((nScale+1.0f) * fWidthMult * RsGlobal->MaximumWidth),
-						fY - ((nScale+1.0f) * fHeightMult * RsGlobal->MaximumHeight)),
-				 CRGBA(0, 0, 0, a));
+		const float scaleX = scale * GetWidthMult() * RsGlobal->MaximumWidth;
+		const float scaleY = scale * GetHeightMult() * RsGlobal->MaximumHeight;
 
-		DrawRect(CRect(	fX - (nScale * fWidthMult * RsGlobal->MaximumWidth),
-						fY + (nScale * fHeightMult * RsGlobal->MaximumHeight),
-						fX + (nScale * fWidthMult * RsGlobal->MaximumWidth),
-						fY - (nScale * fHeightMult * RsGlobal->MaximumHeight)),
-				 CRGBA(r, g, b, a));
+		orgDrawRect<Index>(CRect(x - scaleX, y - scaleY, x + scaleX, y + scaleY), color);
 	}
+
+	HOOK_EACH_INIT(DrawRect, orgDrawRect, DrawRect_Scale);
 }
 
 namespace ScalingFixes
@@ -1680,11 +1678,7 @@ void Patch_III_10(uint32_t width, uint32_t height)
 {
 	using namespace Memory::DynBase;
 
-	DrawRect = (void(*)(const CRect&,const CRGBA&))DynBaseAddress(0x51F970);
-
 	InstantHitsFiredByPlayer = *(int**)DynBaseAddress(0x482C8F);
-	bWantsToDrawHud = *(bool**)DynBaseAddress(0x4A5877);
-	bCamCheck = *(bool**)DynBaseAddress(0x4A588C);
 	RsGlobal = *(RsGlobalType**)DynBaseAddress(0x584C42);
 	HeadlightsFix_JumpBack = (void*)DynBaseAddress(0x5382F2);
 
@@ -1693,7 +1687,6 @@ void Patch_III_10(uint32_t width, uint32_t height)
 	Patch<WORD>(0x5382BF, 0x0EEB);
 	InjectHook(0x5382EC, HeadlightsFix, HookType::Jump);
 
-	InjectHook(0x4A5870, ShowRadarTrace, HookType::Jump);
 	{
 		using namespace ScalingFixes;
 
@@ -1778,11 +1771,7 @@ void Patch_III_11(uint32_t width, uint32_t height)
 {
 	using namespace Memory::DynBase;
 
-	DrawRect = (void(*)(const CRect&,const CRGBA&))DynBaseAddress(0x51FBA0);
-
 	InstantHitsFiredByPlayer = *(int**)DynBaseAddress(0x482D5F);
-	bWantsToDrawHud = *(bool**)DynBaseAddress(0x4A5967);
-	bCamCheck = *(bool**)DynBaseAddress(0x4A597C);
 	RsGlobal = *(RsGlobalType**)DynBaseAddress(0x584F82);
 	HeadlightsFix_JumpBack = (void*)DynBaseAddress(0x538532);
 
@@ -1791,7 +1780,6 @@ void Patch_III_11(uint32_t width, uint32_t height)
 	Patch<WORD>(0x5384FF, 0x0EEB);
 	InjectHook(0x53852C, HeadlightsFix, HookType::Jump);
 
-	InjectHook(0x4A5960, ShowRadarTrace, HookType::Jump);
 	{
 		using namespace ScalingFixes;
 
@@ -1870,16 +1858,12 @@ void Patch_III_Steam(uint32_t width, uint32_t height)
 {
 	using namespace Memory::DynBase;
 
-	DrawRect = (void(*)(const CRect&,const CRGBA&))DynBaseAddress(0x51FB30);
 
 	InstantHitsFiredByPlayer = *(int**)DynBaseAddress(0x482D5F);
-	bWantsToDrawHud = *(bool**)DynBaseAddress(0x4A58F7);
-	bCamCheck = *(bool**)DynBaseAddress(0x4A590C);
 	RsGlobal = *(RsGlobalType**)DynBaseAddress(0x584E72);
 
 	Patch<BYTE>(0x490FD3, 1);
 
-	InjectHook(0x4A58F0, ShowRadarTrace, HookType::Jump);
 	{
 		using namespace ScalingFixes;
 
@@ -1950,6 +1934,20 @@ void Patch_III_Common()
 {
 	using namespace Memory;
 	using namespace hook::txn;
+
+
+	// Scale the radar trace (blip) to resolution
+	try
+	{
+		using namespace RadarTraceScaling;
+
+		std::array<void*, 2> draw_rect = {
+			get_pattern("50 E8 ? ? ? ? 8B 44 24 68 59 59", 1),
+			get_pattern("50 E8 ? ? ? ? 59 59 83 C4 40 5D 5B", 1),
+		};
+		HookEach_DrawRect(draw_rect, InterceptCall);
+	}
+	TXN_CATCH();
 
 
 	// Scale the subtitle shadows correctly
