@@ -88,7 +88,6 @@ struct RsGlobalType
 
 DebugMenuAPI gDebugMenuAPI;
 
-static int*				InstantHitsFiredByPlayer;
 static const void*		HeadlightsFix_JumpBack;
 
 static RsGlobalType*	RsGlobal;
@@ -205,15 +204,16 @@ void ResetMousePos()
 	orgConstructRenderList();
 }
 
-__declspec(naked) void M16StatsFix()
+// ============= Fix M16 first person aiming not adding to the instant hits fired stat =============
+namespace M16StatsFix
 {
-	_asm
+	static int* InstantHitsFiredByPlayer;
+
+	static void* (*orgFindPlayerPed)();
+	static void* FindPlayerPed_CountHit()
 	{
-		add		eax, 0x34
-		add		ebx, 0x34
-		mov		ecx, InstantHitsFiredByPlayer
-		inc		dword ptr [ecx]
-		ret
+		++(*InstantHitsFiredByPlayer);
+		return orgFindPlayerPed();
 	}
 }
 
@@ -1678,7 +1678,6 @@ void Patch_III_10(uint32_t width, uint32_t height)
 {
 	using namespace Memory::DynBase;
 
-	InstantHitsFiredByPlayer = *(int**)DynBaseAddress(0x482C8F);
 	RsGlobal = *(RsGlobalType**)DynBaseAddress(0x584C42);
 	HeadlightsFix_JumpBack = (void*)DynBaseAddress(0x5382F2);
 
@@ -1698,9 +1697,6 @@ void Patch_III_10(uint32_t width, uint32_t height)
 	}
 
 	InjectHook(0x4F9E4D, FixedRefValue);
-
-	Patch<BYTE>(0x5623B5, 0x90);
-	InjectHook(0x5623B6, M16StatsFix, HookType::Call);
 
 	{
 		using namespace PrintStringShadows;
@@ -1771,7 +1767,6 @@ void Patch_III_11(uint32_t width, uint32_t height)
 {
 	using namespace Memory::DynBase;
 
-	InstantHitsFiredByPlayer = *(int**)DynBaseAddress(0x482D5F);
 	RsGlobal = *(RsGlobalType**)DynBaseAddress(0x584F82);
 	HeadlightsFix_JumpBack = (void*)DynBaseAddress(0x538532);
 
@@ -1791,9 +1786,6 @@ void Patch_III_11(uint32_t width, uint32_t height)
 	}
 
 	InjectHook(0x4F9F2D, FixedRefValue);
-
-	Patch<BYTE>(0x5624E5, 0x90);
-	InjectHook(0x5624E6, M16StatsFix, HookType::Call);
 
 	{
 		using namespace PrintStringShadows;
@@ -1858,8 +1850,6 @@ void Patch_III_Steam(uint32_t width, uint32_t height)
 {
 	using namespace Memory::DynBase;
 
-
-	InstantHitsFiredByPlayer = *(int**)DynBaseAddress(0x482D5F);
 	RsGlobal = *(RsGlobalType**)DynBaseAddress(0x584E72);
 
 	Patch<BYTE>(0x490FD3, 1);
@@ -1875,9 +1865,6 @@ void Patch_III_Steam(uint32_t width, uint32_t height)
 	}
 
 	InjectHook(0x4F9EBD, FixedRefValue);
-
-	Patch<BYTE>(0x562495, 0x90);
-	InjectHook(0x562496, M16StatsFix, HookType::Call);
 
 	{
 		using namespace PrintStringShadows;
@@ -1960,6 +1947,20 @@ void Patch_III_Common()
 
 		wDropShadowPosition = *drop_shadow_pos;
 		InterceptCall(crect_ctor, orgCRectCtor, CRectCtor_ShadowAdjust);
+	}
+	TXN_CATCH();
+
+
+	// Fix M16 first person aiming not adding to the instant hits fired stat
+	try
+	{
+		using namespace M16StatsFix;
+
+		auto instant_hits_fired = get_pattern<int*>("83 3D ? ? ? ? ? 74 3A DB 05", 2);
+		auto find_player_ped = get_pattern("89 C5 E8 ? ? ? ? 83 C0 34", 2);
+
+		InstantHitsFiredByPlayer = *instant_hits_fired;
+		InterceptCall(find_player_ped, orgFindPlayerPed, FindPlayerPed_CountHit);
 	}
 	TXN_CATCH();
 
