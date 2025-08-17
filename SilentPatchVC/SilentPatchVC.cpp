@@ -64,7 +64,6 @@ struct RsGlobalType
 DebugMenuAPI gDebugMenuAPI;
 
 static RsGlobalType*	RsGlobal;
-static const void*		SubtitlesShadowFix_JumpBack;
 
 void* (*GetModelInfo)(const char*, int*);
 
@@ -113,12 +112,6 @@ void ResetMousePos()
 		RsMouseSetPos(&vecPos);
 	}
 	orgConstructRenderList();
-}
-
-void __stdcall Recalculate(float& fX, float& fY, signed int nShadow)
-{
-	fX = nShadow * GetWidthMult() * RsGlobal->MaximumWidth;
-	fY = nShadow * GetHeightMult() * RsGlobal->MaximumHeight;
 }
 
 namespace PrintStringShadows
@@ -552,6 +545,46 @@ namespace MinimalHUD
 	}
 }
 
+// ============= Fix text shadows not scaling to resolution =============
+namespace ShadowScalingFixes
+{
+	static int16_t* wDropShadowPosition;
+	static float* fSlantRef;
+
+	static std::pair<float, float> GetShadowOffsets()
+	{
+		const int16_t shadow = std::exchange(*wDropShadowPosition, static_cast<int16_t>(0));
+		return { (shadow * GetWidthMult() * RsGlobal->MaximumWidth) - shadow, (shadow * GetHeightMult() * RsGlobal->MaximumHeight) - shadow };
+	}
+
+	template<std::size_t Index>
+	static void (*orgPrintString)(float x, float y, uint32_t, uint16_t*, uint16_t*, float);
+
+	template<std::size_t Index>
+	static void PrintString_AdjustShadow(float x, float y, uint32_t a3, uint16_t* a4, uint16_t* a5, float a6)
+	{
+		const auto [offsetX, offsetY] = GetShadowOffsets();
+		orgPrintString<Index>(x + offsetX, y + offsetY, a3, a4, a5, a6);
+	}
+
+	template<std::size_t Index>
+	static void PrintString_AdjustSlantAndShadow(float x, float y, uint32_t a3, uint16_t* a4, uint16_t* a5, float a6)
+	{
+		const auto [offsetX, offsetY] = GetShadowOffsets();
+
+		const float origSlantRefX = std::exchange(fSlantRef[0], fSlantRef[0] + offsetX);
+		const float origSlantRefY = std::exchange(fSlantRef[1], fSlantRef[1] + offsetY);
+
+		orgPrintString<Index>(x + offsetX, y + offsetY, a3, a4, a5, a6);
+
+		fSlantRef[0] = origSlantRefX;
+		fSlantRef[1] = origSlantRefY;
+	}
+
+	HOOK_EACH_INIT_CTR(AdjustShadow, 0, orgPrintString, PrintString_AdjustShadow);
+	HOOK_EACH_INIT_CTR(AdjustSlantAndShadow, 1, orgPrintString, PrintString_AdjustSlantAndShadow);
+}
+
 
 // ============= Fix text background padding not scaling to resolution =============
 namespace TextRectPaddingScalingFixes
@@ -667,22 +700,6 @@ namespace LegendBlipFix
 float FixedRefValue()
 {
 	return 1.0f;
-}
-
-__declspec(naked) void SubtitlesShadowFix()
-{
-	_asm
-	{
-		mov		[esp], eax
-		fild	dword ptr [esp]
-		push	eax
-		lea		eax, [esp+20h-18h]
-		push	eax
-		lea		eax, [esp+24h-14h]
-		push	eax
-		call	Recalculate
-		jmp		SubtitlesShadowFix_JumpBack
-	}
 }
 
 __declspec(naked) void CreateInstance_BikeFix()
@@ -2108,20 +2125,8 @@ void Patch_VC_10(uint32_t width, uint32_t height)
 	using namespace Memory::DynBase;
 
 	RsGlobal = *(RsGlobalType**)DynBaseAddress(0x602D32);
-	SubtitlesShadowFix_JumpBack = (void*)DynBaseAddress(0x551701);
 
 	InjectHook(0x5433BD, FixedRefValue);
-
-	InjectHook(0x5516FC, SubtitlesShadowFix, HookType::Jump);
-	Patch<BYTE>(0x5517C4, 0xD9);
-	Patch<BYTE>(0x5517DF, 0xD9);
-	Patch<BYTE>(0x551832, 0xD9);
-	Patch<BYTE>(0x551848, 0xD9);
-	Patch<BYTE>(0x5517E2, 0x34-0x14);
-	Patch<BYTE>(0x55184B, 0x34-0x14);
-	Patch<BYTE>(0x5517C7, 0x28-0x18);
-	Patch<BYTE>(0x551835, 0x24-0x18);
-	Patch<BYTE>(0x5516FB, 0x90);
 
 	{
 		using namespace PrintStringShadows;
@@ -2196,20 +2201,8 @@ void Patch_VC_11(uint32_t width, uint32_t height)
 	using namespace Memory::DynBase;
 
 	RsGlobal = *(RsGlobalType**)DynBaseAddress(0x602D12);
-	SubtitlesShadowFix_JumpBack = (void*)DynBaseAddress(0x551721);
 
 	InjectHook(0x5433DD, FixedRefValue);
-
-	InjectHook(0x55171C, SubtitlesShadowFix, HookType::Jump);
-	Patch<BYTE>(0x5517E4, 0xD9);
-	Patch<BYTE>(0x5517FF, 0xD9);
-	Patch<BYTE>(0x551852, 0xD9);
-	Patch<BYTE>(0x551868, 0xD9);
-	Patch<BYTE>(0x551802, 0x34-0x14);
-	Patch<BYTE>(0x55186B, 0x34-0x14);
-	Patch<BYTE>(0x5517E7, 0x28-0x18);
-	Patch<BYTE>(0x551855, 0x24-0x18);
-	Patch<BYTE>(0x55171B, 0x90);
 
 	{
 		using namespace PrintStringShadows;
@@ -2283,20 +2276,8 @@ void Patch_VC_Steam(uint32_t width, uint32_t height)
 	using namespace Memory::DynBase;
 
 	RsGlobal = *(RsGlobalType**)DynBaseAddress(0x602952);
-	SubtitlesShadowFix_JumpBack = (void*)DynBaseAddress(0x5515F1);
 
 	InjectHook(0x5432AD, FixedRefValue);
-
-	InjectHook(0x5515EC, SubtitlesShadowFix, HookType::Jump);
-	Patch<BYTE>(0x5516B4, 0xD9);
-	Patch<BYTE>(0x5516CF, 0xD9);
-	Patch<BYTE>(0x551722, 0xD9);
-	Patch<BYTE>(0x551738, 0xD9);
-	Patch<BYTE>(0x5516D2, 0x34-0x14);
-	Patch<BYTE>(0x55173B, 0x34-0x14);
-	Patch<BYTE>(0x5516B7, 0x28-0x18);
-	Patch<BYTE>(0x551725, 0x24-0x18);
-	Patch<BYTE>(0x5515EB, 0x90);
 
 	{
 		using namespace PrintStringShadows;
@@ -2383,6 +2364,32 @@ void Patch_VC_Common()
 	using namespace hook::txn;
 
 	const HMODULE hGameModule = GetModuleHandle(nullptr);
+
+	// Fix text shadows not scaling to resolution
+	try
+	{
+		using namespace ShadowScalingFixes;
+
+		auto drop_shadow_reset = pattern("A2 ? ? ? ? 66 C7 05 ? ? ? ? 00 00").get_one();
+		auto slant_ref = get_pattern<float*>("D8 05 ? ? ? ? 89 44 24 0C", 2);
+
+		auto print_string_with_slant = get_pattern("E8 ? ? ? ? 0F BF C5 83 C4 18");
+		auto print_string_without_slant = get_pattern("E8 ? ? ? ? 83 C4 18 8A 44 24 0D");
+
+		std::array<void*, 1> print_string_noslant_hooks = { print_string_without_slant };
+		std::array<void*, 1> print_string_slant_hooks = { print_string_with_slant };
+
+		wDropShadowPosition = *drop_shadow_reset.get<int16_t*>(5 + 3);
+		fSlantRef = *slant_ref;
+
+		// Don't reset wDropShadowPosition, we'll do it ourselves after reading it
+		Nop(drop_shadow_reset.get<void>(5), 9);
+
+		HookEach_AdjustShadow(print_string_noslant_hooks, InterceptCall);
+		HookEach_AdjustSlantAndShadow(print_string_slant_hooks, InterceptCall);
+	}
+	TXN_CATCH();
+
 
 	// New timers fix
 	try

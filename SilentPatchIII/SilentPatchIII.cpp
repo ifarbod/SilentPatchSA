@@ -95,7 +95,6 @@ static const void*		HeadlightsFix_JumpBack;
 static bool*			bWantsToDrawHud;
 static bool*			bCamCheck;
 static RsGlobalType*	RsGlobal;
-static const void*		SubtitlesShadowFix_JumpBack;
 
 auto 					WorldRemove = reinterpret_cast<void(*)(void*)>(hook::get_pattern("8A 43 50 56 24 07", -5));
 
@@ -144,6 +143,20 @@ namespace ScalingFixes
 	}
 
 	HOOK_EACH_INIT(SetScale, orgSetScale, SetScale_Fix);
+
+
+	// Fixed subtitle shadows
+	static int16_t* wDropShadowPosition;
+	static CRect* (__thiscall *orgCRectCtor)(CRect* obj, float left, float bottom, float right, float top);
+	static CRect* __fastcall CRectCtor_ShadowAdjust(CRect* obj, void*, float left, float bottom, float right, float top)
+	{
+		const int16_t shadow = *wDropShadowPosition;
+		const float scaledShadowX = shadow * GetWidthMult() * RsGlobal->MaximumWidth;
+		const float scaledShadowY = shadow * GetHeightMult() * RsGlobal->MaximumHeight;
+
+		return orgCRectCtor(obj, left - shadow + scaledShadowX, bottom - shadow + scaledShadowY,
+				right - shadow + scaledShadowX, top - shadow + scaledShadowY);
+	}
 }
 
 class CGang
@@ -228,14 +241,6 @@ __declspec(naked) void HeadlightsFix()
 	}
 }
 
-static float fShadowXSize, fShadowYSize;
-
-void __stdcall Recalculate(signed int nShadow)
-{
-	fShadowXSize = nShadow * GetWidthMult() * RsGlobal->MaximumWidth;
-	fShadowYSize = nShadow * GetHeightMult() * RsGlobal->MaximumHeight;
-}
-
 namespace PrintStringShadows
 {
 	template<uintptr_t addr>
@@ -310,18 +315,6 @@ namespace PrintStringShadows
 float FixedRefValue()
 {
 	return 1.0f;
-}
-
-__declspec(naked) void SubtitlesShadowFix()
-{
-	_asm
-	{
-		push	eax
-		call	Recalculate
-		fadd	dword ptr [esp+0x50+8]
-		fadd	fShadowYSize
-		jmp		SubtitlesShadowFix_JumpBack
-	}
 }
 
 // ============= Don't reset mouse sensitivity on New Game =============
@@ -1694,7 +1687,6 @@ void Patch_III_10(uint32_t width, uint32_t height)
 	bCamCheck = *(bool**)DynBaseAddress(0x4A588C);
 	RsGlobal = *(RsGlobalType**)DynBaseAddress(0x584C42);
 	HeadlightsFix_JumpBack = (void*)DynBaseAddress(0x5382F2);
-	SubtitlesShadowFix_JumpBack = (void*)DynBaseAddress(0x500D32);
 
 	Patch<BYTE>(0x490F83, 1);
 
@@ -1713,19 +1705,6 @@ void Patch_III_10(uint32_t width, uint32_t height)
 	}
 
 	InjectHook(0x4F9E4D, FixedRefValue);
-
-	InjectHook(0x500D27, SubtitlesShadowFix, HookType::Jump);
-	Patch<WORD>(0x500D4C, 0x05D8);
-	Patch<WORD>(0x500D5F, 0x05D9);
-	Patch<WORD>(0x500D6E, 0x05D9);
-	Patch<void*>(0x500D4E, &fShadowXSize);
-	Patch<void*>(0x500D70, &fShadowXSize);
-	Patch<void*>(0x500D61, &fShadowYSize);
-	Patch<DWORD>(0x500D53, 0x0000441F);
-	Patch<BYTE>(0x500D52, 0x0F);
-	Patch<BYTE>(0x500D65, 0x90);
-	Patch<BYTE>(0x500D6D, 0x50);
-	Patch<WORD>(0x500D74, 0x9066);
 
 	Patch<BYTE>(0x5623B5, 0x90);
 	InjectHook(0x5623B6, M16StatsFix, HookType::Call);
@@ -1806,7 +1785,6 @@ void Patch_III_11(uint32_t width, uint32_t height)
 	bCamCheck = *(bool**)DynBaseAddress(0x4A597C);
 	RsGlobal = *(RsGlobalType**)DynBaseAddress(0x584F82);
 	HeadlightsFix_JumpBack = (void*)DynBaseAddress(0x538532);
-	SubtitlesShadowFix_JumpBack = (void*)DynBaseAddress(0x500E12);
 
 	Patch<BYTE>(0x491043, 1);
 
@@ -1825,19 +1803,6 @@ void Patch_III_11(uint32_t width, uint32_t height)
 	}
 
 	InjectHook(0x4F9F2D, FixedRefValue);
-
-	InjectHook(0x500E07, SubtitlesShadowFix, HookType::Jump);
-	Patch<WORD>(0x500E2C, 0x05D8);
-	Patch<WORD>(0x500E3F, 0x05D9);
-	Patch<WORD>(0x500E4E, 0x05D9);
-	Patch<void*>(0x500E2E, &fShadowXSize);
-	Patch<void*>(0x500E50, &fShadowXSize);
-	Patch<void*>(0x500E41, &fShadowYSize);
-	Patch<DWORD>(0x500E33, 0x0000441F);
-	Patch<BYTE>(0x500E32, 0x0F);
-	Patch<BYTE>(0x500E45, 0x90);
-	Patch<BYTE>(0x500E4D, 0x50);
-	Patch<WORD>(0x500E54, 0x9066);
 
 	Patch<BYTE>(0x5624E5, 0x90);
 	InjectHook(0x5624E6, M16StatsFix, HookType::Call);
@@ -1911,7 +1876,6 @@ void Patch_III_Steam(uint32_t width, uint32_t height)
 	bWantsToDrawHud = *(bool**)DynBaseAddress(0x4A58F7);
 	bCamCheck = *(bool**)DynBaseAddress(0x4A590C);
 	RsGlobal = *(RsGlobalType**)DynBaseAddress(0x584E72);
-	SubtitlesShadowFix_JumpBack = (void*)DynBaseAddress(0x500DA2);
 
 	Patch<BYTE>(0x490FD3, 1);
 
@@ -1927,19 +1891,6 @@ void Patch_III_Steam(uint32_t width, uint32_t height)
 	}
 
 	InjectHook(0x4F9EBD, FixedRefValue);
-
-	InjectHook(0x500D97, SubtitlesShadowFix, HookType::Jump);
-	Patch<WORD>(0x500DBC, 0x05D8);
-	Patch<WORD>(0x500DCF, 0x05D9);
-	Patch<WORD>(0x500DDE, 0x05D9);
-	Patch<void*>(0x500DBE, &fShadowXSize);
-	Patch<void*>(0x500DE0, &fShadowXSize);
-	Patch<void*>(0x500DD1, &fShadowYSize);
-	Patch<DWORD>(0x500DC3, 0x0000441F);
-	Patch<BYTE>(0x500DC2, 0x0F);
-	Patch<BYTE>(0x500DD5, 0x90);
-	Patch<BYTE>(0x500DDD, 0x50);
-	Patch<WORD>(0x500DE4, 0x9066);
 
 	Patch<BYTE>(0x562495, 0x90);
 	InjectHook(0x562496, M16StatsFix, HookType::Call);
@@ -1999,6 +1950,20 @@ void Patch_III_Common()
 {
 	using namespace Memory;
 	using namespace hook::txn;
+
+
+	// Scale the subtitle shadows correctly
+	try
+	{
+		using namespace ScalingFixes;
+
+		auto drop_shadow_pos = get_pattern<int16_t*>("66 8B 1D ? ? ? ? 66 85 DB", 3);
+		auto crect_ctor = get_pattern("8D 4C 24 28 E8 ? ? ? ? D9 EE", 4);
+
+		wDropShadowPosition = *drop_shadow_pos;
+		InterceptCall(crect_ctor, orgCRectCtor, CRectCtor_ShadowAdjust);
+	}
+	TXN_CATCH();
 
 
 	// Don't reset mouse sensitivity on New Game
