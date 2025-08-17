@@ -9,5 +9,5 @@
 #include <cstdio>
 
 #include "Utils/MemoryMgr.h"
-#include "Utils/MemoryMgr.GTA.h"
+#include "MemoryMgr.GTA.h"
 #include "Utils/Patterns.h"
