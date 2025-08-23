@@ -24,7 +24,7 @@ namespace Common {
 
 		if ( cUserFilesPath[0] == '\0' )
 		{	
-			if ( SHGetFolderPathA(nullptr, CSIDL_MYDOCUMENTS, nullptr, SHGFP_TYPE_CURRENT, cUserFilesPath) == S_OK )
+			if (SUCCEEDED(SHGetFolderPathA(nullptr, CSIDL_MYDOCUMENTS, nullptr, SHGFP_TYPE_CURRENT, cUserFilesPath)))
 			{
 				PathAppendA(cUserFilesPath, *ppUserFilesDir);
 				CreateDirectoryA(cUserFilesPath, nullptr);

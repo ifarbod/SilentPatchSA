@@ -1,5 +1,4 @@
 #include "StdAfxSA.h"
-#include <limits>
 #include <algorithm>
 #include <array>
 #include <d3d9.h>
@@ -520,9 +519,9 @@ void RenderWeaponPedsForPC()
 	for ( auto it = ms_weaponPedsForPC.Next( nullptr ); it != nullptr; it = ms_weaponPedsForPC.Next( it ) )
 	{
 		CPed* ped = **it;
-		ped->SetupLighting();
+		const bool bLightingSetup = ped->SetupLighting();
 		ped->RenderWeapon(renderWeapon, true, false);
-		ped->RemoveLighting();
+		ped->RemoveLighting(bLightingSetup);
 	}
 }
 
@@ -536,38 +535,208 @@ static CAEWaveDecoder* __stdcall CAEWaveDecoderInit(CAEDataStream* pStream)
 	return new CAEWaveDecoder(pStream);
 }
 
-namespace ScalingInternals
+namespace UIScales
 {
-	// 1.0 - fast math uses a scaling multiplier
-	float ScaleX_Multiplier(float val)
+	static double** Width_Internal(std::string_view pattern_string, ptrdiff_t offset = 0) try
 	{
-		static float** ResolutionWidthMult = (float**)(0x5733FD + 2);
-		return val * RsGlobal->MaximumWidth * **ResolutionWidthMult;
+		return hook::txn::get_pattern<double*>(pattern_string, offset);
+	}
+	catch (const hook::txn_exception&)
+	{
+		static double fallback = 640.0;
+		static double* pFallback = &fallback;
+		return &pFallback;
 	}
 
-	float ScaleY_Multiplier(float val)
+	static double** Height_Internal(std::string_view pattern_string, ptrdiff_t offset = 0) try
 	{
-		static float** ResolutionHeightMult = (float**)(0x57342D + 2);
-		return val * RsGlobal->MaximumHeight * **ResolutionHeightMult;
+		return hook::txn::get_pattern<double*>(pattern_string, offset);
+	}
+	catch (const hook::txn_exception&)
+	{
+		static double fallback = 448.0;
+		static double* pFallback = &fallback;
+		return &pFallback;
 	}
 
-	// New binaries - precise math uses a scaling divisor
-	float ScaleX_Divisor(float val)
+	static float Width_Internal_Multiply(float** factor)
 	{
-		static double** ResolutionWidthDiv = hook::get_pattern<double*>("DC 35 ? ? ? ? DC 0D ? ? ? ? DE E9 D9 5D F0", 2);
-		return static_cast<float>(val * RsGlobal->MaximumWidth / **ResolutionWidthDiv);
+		return RsGlobal->MaximumWidth * **factor;
 	}
 
-	float ScaleY_Divisor(float val)
+	static float Height_Internal_Multiply(float** factor)
 	{
-		static double** ResolutionHeightDiv = hook::get_pattern<double*>("50 DC 35 ? ? ? ? DC 0D", 1 + 2);
-		return static_cast<float>(val * RsGlobal->MaximumHeight / **ResolutionHeightDiv);
+		return RsGlobal->MaximumHeight * **factor;
+	}
+
+	static float Width_Internal_Divide(double** factor)
+	{
+		return static_cast<float>(RsGlobal->MaximumWidth / **factor);
+	}
+
+	static float Height_Internal_Divide(double** factor)
+	{
+		return static_cast<float>(RsGlobal->MaximumHeight / **factor);
+	}
+
+	// CHud - widescreen fixed, currently scaled by HUD scale
+	// Currently the same as "Hud", but wsfix may separate it in the future
+	struct HudMessages
+	{
+		static float Width_Multiply()
+		{
+			static float** Mult = (float**)(0x58D2DB + 2);
+			return Width_Internal_Multiply(Mult);
+		}
+
+		static float Height_Multiply()
+		{
+			static float** Mult = (float**)(0x58D2C5 + 2);
+			return Height_Internal_Multiply(Mult);
+		}
+
+		static float Width_Divide()
+		{
+			static double** Div = Width_Internal("DC 35 ? ? ? ? DC 0D ? ? ? ? D9 5D FC D9 45 FC D9 1C 24 E8 ? ? ? ? A1", 2);
+			return Width_Internal_Divide(Div);
+		}
+
+		static float Height_Divide()
+		{
+			static double** Div = Height_Internal("83 C4 04 DC 35 ? ? ? ? DC 0D ? ? ? ? D9 5D FC", 3 + 2);
+			return Height_Internal_Divide(Div);
+		}
+
+		static inline auto Width = &Width_Multiply;
+		static inline auto Height = &Height_Multiply;
+
+		static void NewBinaries()
+		{
+			Width = &Width_Divide;
+			Height = &Height_Divide;
+		}
+	};
+
+	// Render2dStuff - widescreen fixed, unaffected by scaling
+	// NOT available in the main menu
+	struct Stuff2d
+	{
+		static float Width_Multiply()
+		{
+			static float** Mult = (float**)(0x53E472 + 2);
+			return Width_Internal_Multiply(Mult);
+		}
+
+		static float Height_Multiply()
+		{
+			static float** Mult = (float**)(0x53E3E7 + 2);
+			return Height_Internal_Multiply(Mult);
+		}
+
+		static float Width_Divide()
+		{
+			static double** Div = Width_Internal("DC 35 ? ? ? ? DC 0D ? ? ? ? DE E9 D9 5D F0", 2);
+			return Width_Internal_Divide(Div);
+		}
+
+		static float Height_Divide()
+		{
+			static double** Div = Height_Internal("50 DC 35 ? ? ? ? DC 0D", 1 + 2);
+			return Height_Internal_Divide(Div);
+		}
+
+		static inline auto Width = &Width_Multiply;
+		static inline auto Height = &Height_Multiply;
+
+		static void NewBinaries()
+		{
+			Width = &Width_Divide;
+			Height = &Height_Divide;
+		}
+	};
+
+	// CMenuManager - widescreen fixed, unaffected by scaling
+	struct MenuManager
+	{
+		static float Width_Multiply()
+		{
+			static float** Mult = (float**)(0x5733FD + 2);
+			return Width_Internal_Multiply(Mult);
+		}
+
+		static float Height_Multiply()
+		{
+			static float** Mult = (float**)(0x57342D + 2);
+			return Height_Internal_Multiply(Mult);
+		}
+
+		static float Width_Divide()
+		{
+			static double** Div = Width_Internal("81 3D ? ? ? ? 80 02 00 00 75 07 D9 45 08 5D C2 04 00 D9 45 08 DC 35", 0x16 + 2);
+			return Width_Internal_Divide(Div);
+		}
+
+		static float Height_Divide()
+		{
+			static double** Div = Height_Internal("81 3D ? ? ? ? C0 01 00 00 75 07 D9 45 08 5D C2 04 00 D9 45 08 DC 35", 0x16 + 2);
+			return Height_Internal_Divide(Div);
+		}
+
+		static inline auto Width = &Width_Multiply;
+		static inline auto Height = &Height_Multiply;
+
+		static void NewBinaries()
+		{
+			Width = &Width_Divide;
+			Height = &Height_Divide;
+		}
+	};
+
+	// CFont - widescreen fixed, scaled by HUD size
+	struct Font
+	{
+		static float Width_Multiply()
+		{
+			static float** Mult = (float**)(0x719C0D + 2);
+			return Width_Internal_Multiply(Mult);
+		}
+
+		static float Height_Multiply()
+		{
+			static float** Mult = (float**)(0x719C27 + 2);
+			return Height_Internal_Multiply(Mult);
+		}
+
+		static float Width_Divide()
+		{
+			static double** Div = Width_Internal("DD 05 ? ? ? ? 8A 0D ? ? ? ? DD 05", 2);
+			return Width_Internal_Divide(Div);
+		}
+
+		static float Height_Divide()
+		{
+			static double** Div = Height_Internal("DD 05 ? ? ? ? 8A 0D ? ? ? ? DD 05", 0xC + 2);
+			return Height_Internal_Divide(Div);
+		}
+
+		static inline auto Width = &Width_Multiply;
+		static inline auto Height = &Height_Multiply;
+
+		static void NewBinaries()
+		{
+			Width = &Width_Divide;
+			Height = &Height_Divide;
+		}
+	};
+
+	static void NewBinaries()
+	{
+		HudMessages::NewBinaries();
+		Stuff2d::NewBinaries();
+		MenuManager::NewBinaries();
+		Font::NewBinaries();
 	}
 }
-
-// Default to 1.0, update these pointers with a pointer to the new binaries function if needed
-auto ScaleX = &ScalingInternals::ScaleX_Multiplier;
-auto ScaleY = &ScalingInternals::ScaleY_Multiplier;
 
 namespace ScriptFixes
 {
@@ -973,7 +1142,7 @@ char* GetMyDocumentsPathSA()
 		static char	cUserFilesPath[MAX_PATH];
 		char* const ppTempBufPtr = Memory::GetVersion().version == 0 ? *AddressByRegion_10<char**>(0x744FE5) : cUserFilesPath;
 
-		if ( SHGetFolderPathA(nullptr, CSIDL_MYDOCUMENTS, nullptr, SHGFP_TYPE_CURRENT, ppTempBufPtr) == S_OK )
+		if (SUCCEEDED(SHGetFolderPathA(nullptr, CSIDL_MYDOCUMENTS, nullptr, SHGFP_TYPE_CURRENT, ppTempBufPtr)))
 		{
 			char** const ppUserFilesDir = AddressByVersion<char**>(0x74503F, 0x74586F, 0x77EE50, { "6A 00 68 80 00 00 02 6A 03 6A 00 6A 01 B9 07 00 00 00", 0x12 + 1 });
 
@@ -2952,18 +3121,21 @@ namespace CreditsScalingFixes
 	template<std::size_t Index>
 	static void PrintString_ScaleY(float fX, float fY, const wchar_t* pText)
 	{
+		using namespace UIScales;
 		if constexpr (Index == 1)
-		{
+		{	
 			// Fix the shadow X scale - the Y scale will be fixed below
-			fX = fX + 1.0f - ScaleX(1.0f);
+			fX = fX + 1.0f - Stuff2d::Width();
 		}
-		orgPrintString<Index>(fX, ScaleY(fY), pText);
+		orgPrintString<Index>(fX, fY * Stuff2d::Height(), pText);
 	}
 
 	static void (*orgSetScale)(float X, float Y);
 	static void SetScale_ScaleToRes(float X, float Y)
 	{
-		orgSetScale(ScaleX(X), ScaleY(Y));
+		using namespace UIScales;
+
+		orgSetScale(X * Stuff2d::Width(), Y * Stuff2d::Height());
 	}
 
 	HOOK_EACH_INIT(PrintString, orgPrintString, PrintString_ScaleY);
@@ -2999,7 +3171,7 @@ namespace SlidingTextsScalingFixes
 		template<std::size_t Index>
 		static void SetRightJustifyWrap_Slide(float wrap)
 		{
-			orgSetRightJustifyWrap<Index>(bSlidingEnabled ? ScaleX(-500.0f) : wrap);
+			orgSetRightJustifyWrap<Index>(bSlidingEnabled ? -500.0f * UIScales::HudMessages::Width() : wrap);
 		}
 
 		HOOK_EACH_INIT(PrintString, orgPrintString, PrintString_Slide);
@@ -3077,7 +3249,8 @@ namespace CrosshairScalingFixes
 	template<std::size_t Index>
 	static void RenderOneXLUSprite_Rotate_Aspect_Scale(float a1, float a2, float a3, float width, float height, uint8_t a6, uint8_t a7, uint8_t a8, short a9, float a10, float a11, uint8_t a12)
 	{
-		orgRenderOneXLUSprite_Rotate_Aspect<Index>(a1, a2, a3, ScaleX(width), ScaleY(height), a6, a7, a8, a9, a10, a11, a12);
+		using namespace UIScales;
+		orgRenderOneXLUSprite_Rotate_Aspect<Index>(a1, a2, a3, width * Stuff2d::Width(), height * Stuff2d::Height(), a6, a7, a8, a9, a10, a11, a12);
 	}
 
 	template<std::size_t Index>
@@ -3089,7 +3262,8 @@ namespace CrosshairScalingFixes
 	template<std::size_t... I>
 	static void RecalculateSizes_GamepadCrosshair(std::index_sequence<I...>)
 	{
-		((Size_Recalculated_GamepadCrosshair<I> = ScaleY(*orgSize_GamepadCrosshair<I>)), ...);
+		const float multiplier = UIScales::Stuff2d::Height();
+		((Size_Recalculated_GamepadCrosshair<I> = *orgSize_GamepadCrosshair<I> * multiplier), ...);
 	}
 
 	template<std::size_t Index>
@@ -3101,7 +3275,8 @@ namespace CrosshairScalingFixes
 	template<std::size_t... I>
 	static void RecalculateSizes_GamepadCrosshair_Double(std::index_sequence<I...>)
 	{
-		((Size_Recalculated_GamepadCrosshair_Double<I> = ScaleY(static_cast<float>(*orgSize_GamepadCrosshair_Double<I>))), ...);
+		const float multiplier = UIScales::Stuff2d::Height();
+		((Size_Recalculated_GamepadCrosshair_Double<I> = *orgSize_GamepadCrosshair_Double<I> * multiplier), ...);
 	}
 
 	static bool (*orgCalcScreenCoors)(const RwV3d&, RwV3d*, float*, float*, bool, bool);
@@ -3129,9 +3304,7 @@ namespace MapScreenScalingFixes
 		_asm
 		{
 			push	ecx
-			push	0x3F800000 // 1.0f
-			call	[ScaleX]
-			add		esp, 4
+			call	[UIScales::MenuManager::Width]
 
 			fsub    st(1), st
 			fxch    st(1)
@@ -3145,9 +3318,7 @@ namespace MapScreenScalingFixes
 		_asm
 		{
 			push	ecx
-			push	0x3F800000 // 1.0f
-			call	[ScaleY]
-			add		esp, 4
+			call	[UIScales::MenuManager::Height]
 
 			fsub    st(1), st
 			fxch    st(1)
@@ -3166,7 +3337,8 @@ namespace MapScreenScalingFixes
 	template<std::size_t... I>
 	static void RecalculateXSize(std::index_sequence<I...>)
 	{
-		((CursorXSize_Recalculated<I> = ScaleX(*orgCursorXSize<I>)), ...);
+		const float multiplier = UIScales::MenuManager::Width();
+		((CursorXSize_Recalculated<I> = *orgCursorXSize<I> * multiplier), ...);
 	}
 
 	template<std::size_t Index>
@@ -3178,7 +3350,8 @@ namespace MapScreenScalingFixes
 	template<std::size_t... I>
 	static void RecalculateYSize(std::index_sequence<I...>)
 	{
-		((CursorYSize_Recalculated<I> = ScaleY(*orgCursorYSize<I>)), ...);
+		const float multiplier = UIScales::MenuManager::Height();
+		((CursorYSize_Recalculated<I> = *orgCursorYSize<I> * multiplier), ...);
 	}
 
 	static void (*orgLimitToMap_Scale)(float* x, float* y);
@@ -3186,8 +3359,8 @@ namespace MapScreenScalingFixes
 	{
 		// LimitToMap assumes it's given scaled coordinates, but then the caller assumes it returns unscaled coordinates.
 		// Need to scale them for the call, then unscale again, to save us from some assembly patching.
-		const float XScale = ScaleX(1.0f);
-		const float YScale = ScaleY(1.0f);
+		const float XScale = UIScales::MenuManager::Width();
+		const float YScale = UIScales::MenuManager::Height();
 
 		*x *= XScale;
 		*y *= YScale;
@@ -3224,7 +3397,8 @@ namespace TextRectPaddingScalingFixes
 	template<std::size_t... I>
 	static void RecalculateXSize(std::index_sequence<I...>)
 	{
-		((PaddingXSize_Recalculated<I> = ScaleX(*orgPaddingXSize<I>)), ...);
+		const float multiplier = UIScales::Font::Width();
+		((PaddingXSize_Recalculated<I> = *orgPaddingXSize<I> * multiplier), ...);
 	}
 
 	template<std::size_t Index>
@@ -3236,7 +3410,8 @@ namespace TextRectPaddingScalingFixes
 	template<std::size_t... I>
 	static void RecalculateYSize(std::index_sequence<I...>)
 	{
-		((PaddingYSize_Recalculated<I> = ScaleY(*orgPaddingYSize<I>)), ...);
+		const float multiplier = UIScales::Font::Height();
+		((PaddingYSize_Recalculated<I> = *orgPaddingYSize<I> * multiplier), ...);
 	}
 
 	template<std::size_t Index>
@@ -3248,7 +3423,8 @@ namespace TextRectPaddingScalingFixes
 	template<std::size_t... I>
 	static void RecalculateYSize_Double(std::index_sequence<I...>)
 	{
-		((PaddingYSize_Double_Recalculated<I> = ScaleY(static_cast<float>(*orgPaddingYSize_Double<I>))), ...);
+		const float multiplier = UIScales::Font::Height();
+		((PaddingYSize_Double_Recalculated<I> = *orgPaddingYSize_Double<I> * multiplier), ...);
 	}
 
 	static short (*orgProcessCurrentString)(uint8_t, float, float, void*);
@@ -4203,7 +4379,7 @@ BOOL InjectDelayedPatches_10()
 
 		const bool bHasDebugMenu = DebugMenuLoad();
 
-		auto PatchFloat = [](float** address, const float*& org, float& replaced)
+		auto InterceptMemDisplacement = [](float** address, const float*& org, float& replaced)
 			{
 				org = *address;
 				Patch(address, &replaced);
@@ -4712,8 +4888,8 @@ BOOL InjectDelayedPatches_10()
 				std::array<float**, 2> cursorXSizes = { (float**)(0x588251 + 2), (float**)(0x588265 + 2) };
 				std::array<float**, 2> cursorYSizes = { (float**)(0x5882A8 + 2), (float**)(0x5882C6 + 2) };
 
-				HookEach_CursorXSize(cursorXSizes, PatchFloat);
-				HookEach_CursorYSize(cursorYSizes, PatchFloat);
+				HookEach_CursorXSize(cursorXSizes, InterceptMemDisplacement);
+				HookEach_CursorYSize(cursorYSizes, InterceptMemDisplacement);
 				InterceptCall(0x58822D, orgLimitToMap_RecalculateSizes, LimitToMap_RecalculateSizes<cursorXSizes.size(), cursorYSizes.size()>);
 			}
 
@@ -4750,8 +4926,8 @@ BOOL InjectDelayedPatches_10()
 					(float**)(0x71A6BF + 2), (float**)(0x71A6EC + 2),
 				};
 
-				HookEach_PaddingXSize(paddingXSizes, PatchFloat);
-				HookEach_PaddingYSize(paddingYSizes, PatchFloat);
+				HookEach_PaddingXSize(paddingXSizes, InterceptMemDisplacement);
+				HookEach_PaddingYSize(paddingYSizes, InterceptMemDisplacement);
 				InterceptCall(0x71A631, orgProcessCurrentString, ProcessCurrentString_Scale<paddingXSizes.size(), paddingYSizes.size()>);
 			}
 		}
@@ -4866,8 +5042,7 @@ BOOL InjectDelayedPatches_11()
 				{
 					if (!fallback)
 					{
-						org = *((RpAtomic*(**)(RpAtomic*))address);
-						Patch(address, &replaced);
+						InterceptMemDisplacement(address, org, replaced);
 					}
 					else
 					{
@@ -5066,8 +5241,7 @@ BOOL InjectDelayedPatches_Steam()
 				{
 					if (!fallback)
 					{
-						org = *((RpAtomic*(**)(RpAtomic*))address);
-						Patch(address, &replaced);
+						InterceptMemDisplacement(address, org, replaced);
 					}
 					else
 					{
@@ -5218,12 +5392,6 @@ BOOL InjectDelayedPatches_NewBinaries()
 
 		const bool bHasDebugMenu = DebugMenuLoad();
 
-		auto PatchDouble = [](double** address, const double*& org, double& replaced)
-			{
-				org = *address;
-				Patch(address, &replaced);
-			};
-
 		// Race condition in CdStream fixed
 		// Not taking effect with modloader
 		//if ( !ModCompat::ModloaderCdStreamRaceConditionAware( modloaderModule ) )
@@ -5369,7 +5537,7 @@ BOOL InjectDelayedPatches_NewBinaries()
 				paddingSize.get(1).get<double*>(2),
 			};
 
-			HookEach_PaddingYSize_Double(paddingYSizes, PatchDouble);
+			HookEach_PaddingYSize_Double(paddingYSizes, InterceptMemDisplacement);
 			InterceptCall(processCurrentString, orgProcessCurrentString, ProcessCurrentString_Scale_NewBinaries<paddingYSizes.size()>);
 		}
 		TXN_CATCH();
@@ -5431,7 +5599,7 @@ void Patch_SA_10(HINSTANCE hInstance)
 	InstallMemValidator();
 #endif
 
-	auto PatchFloat = [](float** address, const float*& org, float& replaced)
+	auto InterceptMemDisplacement = [](float** address, const float*& org, float& replaced)
 		{
 			org = *address;
 			Patch(address, &replaced);
@@ -6570,7 +6738,7 @@ void Patch_SA_10(HINSTANCE hInstance)
 		HookEach_RenderOneXLUSprite_Rotate_Aspect(renderRotateAspect, InterceptCall);
 
 		InterceptCall(0x74318D, orgCalcScreenCoors, CalcScreenCoors_Recalculate<triangleSizes.size(), 0>);
-		HookEach_GamepadCrosshair(triangleSizes, PatchFloat);
+		HookEach_GamepadCrosshair(triangleSizes, InterceptMemDisplacement);
 	}
 
 
@@ -7394,19 +7562,7 @@ void Patch_SA_NewBinaries_Common(HINSTANCE hInstance)
 	using namespace Memory;
 	using namespace hook::txn;
 
-	ScaleX = &ScalingInternals::ScaleX_Divisor;
-	ScaleY = &ScalingInternals::ScaleY_Divisor;
-
-	auto PatchFloat = [](float** address, const float*& org, float& replaced)
-		{
-			org = *address;
-			Patch(address, &replaced);
-		};
-	auto PatchDouble = [](double** address, const double*& org, double& replaced)
-		{
-			org = *address;
-			Patch(address, &replaced);
-		};
+	UIScales::NewBinaries();
 
 	try
 	{
@@ -8763,8 +8919,8 @@ void Patch_SA_NewBinaries_Common(HINSTANCE hInstance)
 		HookEach_RenderOneXLUSprite_Rotate_Aspect(renderRotateAspect, InterceptCall);
 
 		InterceptCall(calcScreenCoors, orgCalcScreenCoors, CalcScreenCoors_Recalculate<triangleSizes.size(), triangleSizesDouble.size()>);
-		HookEach_GamepadCrosshair(triangleSizes, PatchFloat);
-		HookEach_GamepadCrosshair_Double(triangleSizesDouble, PatchDouble);
+		HookEach_GamepadCrosshair(triangleSizes, InterceptMemDisplacement);
+		HookEach_GamepadCrosshair_Double(triangleSizesDouble, InterceptMemDisplacement);
 	}
 	TXN_CATCH();
 

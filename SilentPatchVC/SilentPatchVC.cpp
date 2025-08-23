@@ -15,6 +15,7 @@
 #include "Random.h"
 
 #include <array>
+#include <limits>
 #include <memory>
 #include <Shlwapi.h>
 #include <time.h>
@@ -71,16 +72,159 @@ void* (*GetModelInfo)(const char*, int*);
 CVehicleModelInfo**& ms_modelInfoPtrs = *hook::get_pattern<CVehicleModelInfo**>("8B 15 ? ? ? ? 8D 04 24", 2);
 int32_t& numModelInfos = *hook::get_pattern<int32_t>("81 FD ? ? ? ? 7C B7", 2);
 
-float GetWidthMult()
+namespace UIScales
 {
-	static float**	ResolutionWidthMult = hook::get_pattern<float*>("D8 0D ? ? ? ? D1 F8 52", 2);
-	return **ResolutionWidthMult;
-}
+	static float** Width_Internal(std::string_view pattern_string, ptrdiff_t offset = 0) try
+	{
+		return hook::txn::get_pattern<float*>(pattern_string, offset);
+	}
+	catch (const hook::txn_exception&)
+	{
+		static float fallback = 1.0f / 640.0f;
+		static float* pFallback = &fallback;
+		return &pFallback;
+	}
 
-float GetHeightMult()
-{
-	static float**	ResolutionHeightMult = hook::get_pattern<float*>("D8 0D ? ? ? ? D1 F8 C7 44 24 ? 00 00 00 00 89 04 24", 2);
-	return **ResolutionHeightMult;
+	static float** Height_Internal(std::string_view pattern_string, ptrdiff_t offset = 0) try
+	{
+		return hook::txn::get_pattern<float*>(pattern_string, offset);
+	}
+	catch (const hook::txn_exception&)
+	{
+		static float fallback = 1.0f / 448.0f;
+		static float* pFallback = &fallback;
+		return &pFallback;
+	}
+
+	static float Width_Internal_Scale(float** factor)
+	{
+		return RsGlobal->MaximumWidth * **factor;
+	}
+
+	static float Height_Internal_Scale(float** factor)
+	{
+		return RsGlobal->MaximumHeight * **factor;
+	}
+
+
+	// Each static struct here uses scaling constants from a different game class.
+	// They are separated for the bext compatibility with the widescreen fix, and can be used
+	// directly or as template parameters for PrintString fixes
+
+	// CDarkel - widescreen fixed, scaled by HUD scale
+	struct Darkel
+	{
+		static float Width()
+		{
+			static float** Mult = Width_Internal("D8 0D ? ? ? ? 50 D8 0D ? ? ? ? D9 1C 24 A1 ? ? ? ? 89 44 24 08 DB 44 24 08 89 44 24 08 D8 0D", 0x21 + 2);
+			return Width_Internal_Scale(Mult);
+		}
+
+		static float Height()
+		{
+			static float** Mult = Height_Internal("D8 0D ? ? ? ? 50 D8 0D ? ? ? ? D9 1C 24 A1 ? ? ? ? 89 44 24 08 DB 44 24 08 89 44 24 08 D8 0D", 2);
+			return Height_Internal_Scale(Mult);
+		}
+	};
+
+	// CHud - widescreen fixed, scaled by HUD scale
+	// Currently the same as "HudMessages", but wsfix may separate it in the future
+	struct Hud
+	{
+		static float Width()
+		{
+			static float** Mult = Height_Internal("D8 0D ? ? ? ? D8 0D ? ? ? ? D9 1C 24 A1 ? ? ? ? 89 44 24 70 50 DB 44 24 74 89 44 24 74 D8 0D", 0x21 + 2);
+			return Width_Internal_Scale(Mult);
+		}
+
+		static float Height()
+		{
+			static float** Mult = Height_Internal("D8 0D ? ? ? ? D8 0D ? ? ? ? D9 1C 24 A1 ? ? ? ? 89 44 24 70 50 DB 44 24 74 89 44 24 74 D8 0D", 2);
+			return Height_Internal_Scale(Mult);
+		}
+	};
+
+	// CHud - widescreen fixed, currently scaled by HUD scale
+	// Currently the same as "Hud", but wsfix may separate it in the future
+	struct HudMessages
+	{
+		static float Width()
+		{
+			static float** Mult = Width_Internal("66 83 FB 10 0F 82 ? ? ? ? 66 83 3D ? ? ? ? ? 0F 84 ? ? ? ? E8 ? ? ? ? E8 ? ? ? ? DB 05 ? ? ? ? 50 D8 0D ? ? ? ? D8 0D ? ? ? ? D9 1C 24 DB 05 ? ? ? ? 50 D8 0D", 0x3F + 2);
+			return Width_Internal_Scale(Mult);
+		}
+
+		static float Height()
+		{
+			static float** Mult = Height_Internal("66 83 FB 10 0F 82 ? ? ? ? 66 83 3D ? ? ? ? ? 0F 84 ? ? ? ? E8 ? ? ? ? E8 ? ? ? ? DB 05 ? ? ? ? 50 D8 0D ? ? ? ? D8 0D ? ? ? ? D9 1C 24 DB 05 ? ? ? ? 50 D8 0D", 0x29 + 2);
+			return Height_Internal_Scale(Mult);
+		}
+	};
+
+	// cMusicManager - widescreen fixed, affected by HUD scale
+	struct MusicManager
+	{
+		static float Width()
+		{
+			static float** Mult = Width_Internal("D8 0D ? ? ? ? D8 0D ? ? ? ? D9 1C 24 E8 ? ? ? ? 59 8D 4C 24 0C 68 ? ? ? ? 6A 00 6A 00 6A 00", 2);
+			return Width_Internal_Scale(Mult);
+		}
+
+		static float Height()
+		{
+			static float** Mult = Height_Internal("D8 0D ? ? ? ? D8 0D ? ? ? ? D8 05 ? ? ? ? D9 1C 24 A1 ? ? ? ? 3D ? ? ? ? 83 D8 FF D1 F8", 2);
+			return Height_Internal_Scale(Mult);
+		}
+	};
+
+	// Render2dStuff - widescreen fixed, unaffected by scaling
+	// NOT available in the main menu
+	struct Stuff2d
+	{
+		static float Width()
+		{
+			static float** Mult = Width_Internal("D8 0D ? ? ? ? D1 F8 52", 2);
+			return Width_Internal_Scale(Mult);
+		}
+
+		static float Height()
+		{
+			static float** Mult = Height_Internal("D8 0D ? ? ? ? D1 F8 C7 44 24 ? 00 00 00 00 89 04 24", 2);
+			return Height_Internal_Scale(Mult);
+		}
+	};
+
+	// CRadar - widescreen fixed, width scaled by radar scale
+	struct Radar
+	{
+		static float Width()
+		{
+			static float** Mult = Width_Internal("D8 0D ? ? ? ? DE C9 D9 5C 24 28", 2);
+			return Width_Internal_Scale(Mult);
+		}
+
+		static float Height()
+		{
+			static float** Mult = Height_Internal("D8 0D ? ? ? ? DE C9 EB 75", 2);
+			return Height_Internal_Scale(Mult);
+		}
+	};
+
+	// CMenuManager - widescreen fixed, unaffected by scaling
+	struct MenuManager
+	{
+		static float Width()
+		{
+			static float** Mult = Width_Internal("D9 C1 D8 0D ? ? ? ? 89 74 24 18", 2 + 2);
+			return Width_Internal_Scale(Mult);
+		}
+
+		static float Height()
+		{
+			static float** Mult = Height_Internal("D9 C1 D8 0D ? ? ? ? 89 54 24 18", 2 + 2);
+			return Height_Internal_Scale(Mult);
+		}
+	};
 }
 
 static bool bGameInFocus = true;
@@ -119,18 +263,18 @@ namespace PrintStringShadows
 	template<uintptr_t addr>
 	static const float** margin = reinterpret_cast<const float**>(Memory::DynBaseAddress(addr));
 
-	static void PrintString_Internal(void (*printFn)(float,float,const wchar_t*), float fX, float fY, float fMarginX, float fMarginY, const wchar_t* pText)
+	static void PrintString_Internal(void (*printFn)(float,float,const wchar_t*), float fX, float fY, float fMarginX, float fMarginY, float fScaleX, float fScaleY, const wchar_t* pText)
 	{
-		printFn(fX - fMarginX + (fMarginX * GetWidthMult() * RsGlobal->MaximumWidth), fY - fMarginY + (fMarginY * GetHeightMult() * RsGlobal->MaximumHeight), pText);
+		printFn(fX - fMarginX + (fMarginX * fScaleX), fY - fMarginY + (fMarginY * fScaleY), pText);
 	}
 
-	template<uintptr_t pFltX, uintptr_t pFltY>
+	template<uintptr_t pFltX, uintptr_t pFltY, typename Scaler>
 	struct XY
 	{
 		static inline void (*orgPrintString)(float,float,const wchar_t*);
 		static void PrintString(float fX, float fY, const wchar_t* pText)
 		{
-			PrintString_Internal(orgPrintString, fX, fY, **margin<pFltX>, **margin<pFltY>, pText);
+			PrintString_Internal(orgPrintString, fX, fY, **margin<pFltX>, **margin<pFltY>, Scaler::Width(), Scaler::Height(), pText);
 		}
 
 		static void Hook(uintptr_t addr)
@@ -139,13 +283,13 @@ namespace PrintStringShadows
 		}
 	};
 
-	template<uintptr_t pFltX, uintptr_t pFltY>
+	template<uintptr_t pFltX, uintptr_t pFltY, typename Scaler>
 	struct XYMinus
 	{
 		static inline void (*orgPrintString)(float,float,const wchar_t*);
 		static void PrintString(float fX, float fY, const wchar_t* pText)
 		{
-			PrintString_Internal(orgPrintString, fX, fY, -(**margin<pFltX>), -(**margin<pFltY>), pText);
+			PrintString_Internal(orgPrintString, fX, fY, -(**margin<pFltX>), -(**margin<pFltY>), Scaler::Width(), Scaler::Height(), pText);
 		}
 
 		static void Hook(uintptr_t addr)
@@ -154,13 +298,13 @@ namespace PrintStringShadows
 		}
 	};
 
-	template<uintptr_t pFltX>
+	template<uintptr_t pFltX, typename Scaler>
 	struct X
 	{
 		static inline void (*orgPrintString)(float,float,const wchar_t*);
 		static void PrintString(float fX, float fY, const wchar_t* pText)
 		{
-			PrintString_Internal(orgPrintString, fX, fY, **margin<pFltX>, 0.0f, pText);
+			PrintString_Internal(orgPrintString, fX, fY, **margin<pFltX>, 0.0f, Scaler::Width(), 0.0f, pText);
 		}
 
 		static void Hook(uintptr_t addr)
@@ -169,13 +313,13 @@ namespace PrintStringShadows
 		}
 	};
 
-	template<uintptr_t pFltX>
+	template<uintptr_t pFltX, typename Scaler>
 	struct XMinus
 	{
 		static inline void (*orgPrintString)(float,float,const wchar_t*);
 		static void PrintString(float fX, float fY, const wchar_t* pText)
 		{
-			PrintString_Internal(orgPrintString, fX, fY, -(**margin<pFltX>), 0.0f, pText);
+			PrintString_Internal(orgPrintString, fX, fY, -(**margin<pFltX>), 0.0f, Scaler::Width(), 0.0f, pText);
 		}
 
 		static void Hook(uintptr_t addr)
@@ -190,7 +334,7 @@ namespace PrintStringShadows
 		static inline void (*orgPrintString)(float,float,const wchar_t*);
 		static void PrintString(float fX, float fY, const wchar_t* pText)
 		{
-			PrintString_Internal(orgPrintString, fX, fY, 0.0f, **margin<pFltY>, pText);
+			PrintString_Internal(orgPrintString, fX, fY, 0.0f, **margin<pFltY>, 0.0f, Scaler::Height(), pText);
 		}
 
 		static void Hook(uintptr_t addr)
@@ -205,7 +349,6 @@ namespace RadardiscFixes
 {
 	static const float RADARDISC_SHRINK = 2.0f; // We are shrinking the radardisc by that
 
-	static float orgRadarXPosVal;
 	static float* orgRadarXPosPtr;
 
 	template<std::size_t Index>
@@ -217,7 +360,7 @@ namespace RadardiscFixes
 	template<std::size_t... I>
 	static void RecalculateXPositions_RadardiscShrink(std::index_sequence<I...>)
 	{
-		const float multiplier = GetWidthMult() * RsGlobal->MaximumWidth;
+		const float multiplier = UIScales::Radar::Width();
 		((RadarXPos_Recalculated_RadardiscShrink<I> = (*orgRadarXPos_RadardiscShrink<I> - RADARDISC_SHRINK) * multiplier), ...);
 	}
 
@@ -230,7 +373,7 @@ namespace RadardiscFixes
 	template<std::size_t... I>
 	static void RecalculateYPositions_RadardiscShrink(std::index_sequence<I...>)
 	{
-		const float multiplier = GetHeightMult() * RsGlobal->MaximumHeight;
+		const float multiplier = UIScales::Radar::Height();
 		((RadarYPos_Recalculated_RadardiscShrink<I> = (*orgRadarYPos_RadardiscShrink<I> - RADARDISC_SHRINK) * multiplier), ...);
 	}
 
@@ -238,7 +381,8 @@ namespace RadardiscFixes
 	template<std::size_t NumXPosRadardisc, std::size_t NumYPosRadardisc>
 	static void DrawMap_RecalculatePositions()
 	{
-		*orgRadarXPosPtr = orgRadarXPosVal * GetWidthMult() * RsGlobal->MaximumWidth;
+		static const float orgRadarXPosVal = *orgRadarXPosPtr; // Cache it once
+		*orgRadarXPosPtr = orgRadarXPosVal * UIScales::Radar::Width();
 		RecalculateXPositions_RadardiscShrink(std::make_index_sequence<NumXPosRadardisc>{});
 		RecalculateYPositions_RadardiscShrink(std::make_index_sequence<NumYPosRadardisc>{});
 		orgDrawMap();
@@ -250,7 +394,7 @@ namespace RadardiscFixes
 	static CRect ScaleWidthRect(CRect rect)
 	{
 		// Also account for a smaller radardisc
-		rect.x1 = (rect.x1 + RADARDISC_SHRINK) * GetWidthMult() * RsGlobal->MaximumWidth;
+		rect.x1 = (rect.x1 + RADARDISC_SHRINK) * UIScales::Radar::Width();
 		return rect;
 	}
 
@@ -284,14 +428,14 @@ namespace OnscreenCounterBarFixes
 	template<std::size_t... I>
 	static void RecalculateXPositions(std::index_sequence<I...>)
 	{
-		const float multiplier = GetWidthMult() * RsGlobal->MaximumWidth;
+		const float multiplier = UIScales::Hud::Width();
 		((XPos_Recalculated<I> = *orgXPos<I> * multiplier), ...);
 	}
 
 	template<std::size_t... I>
 	static void RecalculateYPositions(std::index_sequence<I...>)
 	{
-		const float multiplier = GetHeightMult() * RsGlobal->MaximumHeight;
+		const float multiplier = UIScales::Hud::Height();
 		((YPos_Recalculated<I> = *orgYPos<I> * multiplier), ...);
 	}
 
@@ -328,14 +472,14 @@ namespace RadarTraceOutlineFixes
 	template<std::size_t... I>
 	static void RecalculateXPositions(std::index_sequence<I...>)
 	{
-		const float multiplier = GetWidthMult() * RsGlobal->MaximumWidth;
+		const float multiplier = UIScales::Stuff2d::Width();
 		((XPos_Recalculated<I> = *orgXPos<I> * multiplier), ...);
 	}
 
 	template<std::size_t... I>
 	static void RecalculateYPositions(std::index_sequence<I...>)
 	{
-		const float multiplier = GetHeightMult() * RsGlobal->MaximumHeight;
+		const float multiplier = UIScales::Stuff2d::Height();
 		((YPos_Recalculated<I> = *orgYPos<I> * multiplier), ...);
 	}
 
@@ -384,14 +528,14 @@ namespace LoadingBarOutlineFixes
 	template<std::size_t... I>
 	static void RecalculateXPositions(std::index_sequence<I...>)
 	{
-		const float multiplier = GetWidthMult() * RsGlobal->MaximumWidth;
+		const float multiplier = UIScales::Stuff2d::Width();
 		((XPos_Recalculated<I> = *orgXPos<I> * multiplier), ...);
 	}
 
 	template<std::size_t... I>
 	static void RecalculateYPositions(std::index_sequence<I...>)
 	{
-		const float multiplier = GetHeightMult() * RsGlobal->MaximumHeight;
+		const float multiplier = UIScales::Stuff2d::Height();
 		((YPos_Recalculated<I> = *orgYPos<I> * multiplier), ...);
 	}
 
@@ -422,13 +566,13 @@ namespace CreditsScalingFixes
 	template<std::size_t Index>
 	static void PrintString_ScaleY(float fX, float fY, const wchar_t* pText)
 	{
-		orgPrintString<Index>(fX, fY * GetHeightMult() * RsGlobal->MaximumHeight, pText);
+		orgPrintString<Index>(fX, fY * UIScales::Stuff2d::Height(), pText);
 	}
 
 	static void (*orgSetScale)(float X, float Y);
 	static void SetScale_ScaleToRes(float X, float Y)
 	{
-		orgSetScale(X * GetWidthMult() * RsGlobal->MaximumWidth, Y * GetHeightMult() * RsGlobal->MaximumHeight);
+		orgSetScale(X * UIScales::Stuff2d::Width(), Y * UIScales::Stuff2d::Height());
 	}
 
 	HOOK_EACH_INIT(PrintString, orgPrintString, PrintString_ScaleY);
@@ -464,7 +608,7 @@ namespace SlidingTextsScalingFixes
 		template<std::size_t Index>
 		static void SetRightJustifyWrap_Slide(float wrap)
 		{
-			orgSetRightJustifyWrap<Index>(bSlidingEnabled ? -500.0f * GetWidthMult() * RsGlobal->MaximumWidth : wrap);
+			orgSetRightJustifyWrap<Index>(bSlidingEnabled ? -500.0f * UIScales::HudMessages::Width() : wrap);
 		}
 
 		HOOK_EACH_INIT(PrintString, orgPrintString, PrintString_Slide);
@@ -554,7 +698,14 @@ namespace ShadowScalingFixes
 	static std::pair<float, float> GetShadowOffsets()
 	{
 		const int16_t shadow = std::exchange(*wDropShadowPosition, static_cast<int16_t>(0));
-		return { (shadow * GetWidthMult() * RsGlobal->MaximumWidth) - shadow, (shadow * GetHeightMult() * RsGlobal->MaximumHeight) - shadow };
+		float scaleX = UIScales::Hud::Width();
+		float scaleY = UIScales::Hud::Height();
+		if (std::abs(scaleX) < std::numeric_limits<float>::epsilon() || std::abs(scaleY) < std::numeric_limits<float>::epsilon())
+		{
+			scaleX = UIScales::MenuManager::Width();
+			scaleY = UIScales::MenuManager::Height();
+		}
+		return { (shadow * scaleX) - shadow, (shadow * scaleY) - shadow };
 	}
 
 	template<std::size_t Index>
@@ -598,7 +749,7 @@ namespace TextRectPaddingScalingFixes
 	template<std::size_t... I>
 	static void RecalculateXSize(std::index_sequence<I...>)
 	{
-		const float multiplier = GetWidthMult() * RsGlobal->MaximumWidth;
+		const float multiplier = UIScales::Hud::Width();
 		((PaddingXSize_Recalculated<I> = *orgPaddingXSize<I> * multiplier), ...);
 	}
 
@@ -611,7 +762,7 @@ namespace TextRectPaddingScalingFixes
 	template<std::size_t... I>
 	static void RecalculateYSize(std::index_sequence<I...>)
 	{
-		const float multiplier = GetHeightMult() * RsGlobal->MaximumHeight;
+		const float multiplier = UIScales::Hud::Height();
 		((PaddingYSize_Recalculated<I> = *orgPaddingYSize<I> * multiplier), ...);
 	}
 
@@ -636,7 +787,7 @@ namespace TextRectPaddingScalingFixes
 	template<std::size_t... I>
 	static void RecalculateWrapX(std::index_sequence<I...>)
 	{
-		const float multiplier = GetWidthMult() * RsGlobal->MaximumWidth;
+		const float multiplier = UIScales::Hud::Width();
 		((WrapX_Recalculated<I> = *orgWrapX<I> * multiplier), ...);
 	}
 
@@ -664,7 +815,7 @@ namespace BigMessage3ScalingFixes
 	template<std::size_t... I>
 	static void RecalculateYOffset(std::index_sequence<I...>)
 	{
-		const float multiplier = GetHeightMult() * RsGlobal->MaximumHeight;
+		const float multiplier = UIScales::HudMessages::Height();
 		((OffsetY_Recalculated<I> = *orgOffsetY<I> * multiplier), ...);
 	}
 
@@ -1454,12 +1605,6 @@ void InjectDelayedPatches_VC_Common( bool bHasDebugMenu, const wchar_t* wcModule
 		}
 	}
 
-	auto PatchFloat = [](float** address, const float*& org, float& replaced)
-		{
-			org = *address;
-			Patch(address, &replaced);
-		};
-
 	// Locale based metric/imperial system INI/debug menu
 	{
 		using namespace Localization;
@@ -1708,8 +1853,7 @@ void InjectDelayedPatches_VC_Common( bool bHasDebugMenu, const wchar_t* wcModule
 		//    Missing out on a fix is better than breaking something.
 		if (hGameModule == ModCompat::Utils::GetModuleHandleFromAddress(radarPos))
 		{
-			static float fYouAreHereSize;
-			orgRadarXPosVal = fYouAreHereSize = *radarPos;
+			static float fYouAreHereSize = *radarPos;
 			orgRadarXPosPtr = radarPos;
 
 			for (float** val : youAreHereSize)
@@ -1720,8 +1864,8 @@ void InjectDelayedPatches_VC_Common( bool bHasDebugMenu, const wchar_t* wcModule
 				}
 			}
 
-			HookEach_CalculateRadarXPos_RadardiscShrink(radarXPos_RadardiscShrink, PatchFloat);
-			HookEach_CalculateRadarYPos_RadardiscShrink(radarYPos_RadardiscShrink, PatchFloat);
+			HookEach_CalculateRadarXPos_RadardiscShrink(radarXPos_RadardiscShrink, InterceptMemDisplacement);
+			HookEach_CalculateRadarYPos_RadardiscShrink(radarYPos_RadardiscShrink, InterceptMemDisplacement);
 			HookEach_DrawRadarDisc(spriteDraw, InterceptCall);
 			InterceptCall(drawMap, orgDrawMap, DrawMap_RecalculatePositions<radarXPos_RadardiscShrink.size(), radarYPos_RadardiscShrink.size()>);
 		}
@@ -1753,8 +1897,8 @@ void InjectDelayedPatches_VC_Common( bool bHasDebugMenu, const wchar_t* wcModule
 			shadow2.get<float*>(15 + 2),
 		};
 
-		HookEach_XPos(XPositions, PatchFloat);
-		HookEach_YPos(YPositions, PatchFloat);
+		HookEach_XPos(XPositions, InterceptMemDisplacement);
+		HookEach_YPos(YPositions, InterceptMemDisplacement);
 
 		InterceptCall(atoiWrap, orgAtoi, atoi_RecalculatePositions<XPositions.size(), YPositions.size()>);
 	}
@@ -1796,8 +1940,8 @@ void InjectDelayedPatches_VC_Common( bool bHasDebugMenu, const wchar_t* wcModule
 			showRadarTraceWithHeight.get(1).get<void>(),
 		};
 
-		HookEach_XPos(XPositions, PatchFloat);
-		HookEach_YPos(YPositions, PatchFloat);
+		HookEach_XPos(XPositions, InterceptMemDisplacement);
+		HookEach_YPos(YPositions, InterceptMemDisplacement);
 		PositionRecalculator<XPositions.size(), YPositions.size()>::HookEach_ShowRadarTraceWithHeight(showRadarTraceWithHeight_Patches, InterceptCall);
 	}
 	TXN_CATCH();
@@ -1820,8 +1964,8 @@ void InjectDelayedPatches_VC_Common( bool bHasDebugMenu, const wchar_t* wcModule
 			get_pattern<float*>("D8 05 ? ? ? ? D9 5C 24 34 DE D9", 2),
 		};
 
-		HookEach_XPos(XPositions, PatchFloat);
-		HookEach_YPos(YPositions, PatchFloat);
+		HookEach_XPos(XPositions, InterceptMemDisplacement);
+		HookEach_YPos(YPositions, InterceptMemDisplacement);
 		InterceptCall(rgbaCtor, orgRGBACtor, RGBACtor_RecalculatePositions<XPositions.size(), YPositions.size()>);
 	}
 	TXN_CATCH();
@@ -2074,11 +2218,11 @@ void InjectDelayedPatches_VC_Common( bool bHasDebugMenu, const wchar_t* wcModule
 			get_pattern<float*>("D8 25 ? ? ? ? D9 1C 24 DD D8", 2),
 		};
 
-		HookEach_PaddingXSize(paddingXSizes, PatchFloat);
-		HookEach_PaddingYSize(paddingYSizes, PatchFloat);
+		HookEach_PaddingXSize(paddingXSizes, InterceptMemDisplacement);
+		HookEach_PaddingYSize(paddingYSizes, InterceptMemDisplacement);
 		InterceptCall(getTextRect, orgGetTextRect, GetTextRect_Recalculate<paddingXSizes.size(), paddingYSizes.size()>);
 
-		HookEach_WrapX(wrapxWidth, PatchFloat);
+		HookEach_WrapX(wrapxWidth, InterceptMemDisplacement);
 		InterceptCall(setJustifyOff_helpBox, orgSetJustifyOff, SetJustifyOff_Recalculate<wrapxWidth.size()>);
 	}
 	TXN_CATCH();
@@ -2094,7 +2238,7 @@ void InjectDelayedPatches_VC_Common( bool bHasDebugMenu, const wchar_t* wcModule
 			get_pattern<float*>("D8 25 ? ? ? ? D9 1C 24 A1", 2),
 		};
 
-		HookEach_MessageYOffset(YOffset, PatchFloat);
+		HookEach_MessageYOffset(YOffset, InterceptMemDisplacement);
 		InterceptCall(setDropColor, orgSetDropColor, SetDropColor_Scale<YOffset.size()>);
 	}
 	TXN_CATCH();
@@ -2130,9 +2274,10 @@ void Patch_VC_10(uint32_t width, uint32_t height)
 
 	{
 		using namespace PrintStringShadows;
+		using namespace UIScales;
 
-		XY<0x5FA1F6, 0x5FA1D5>::Hook(0x5FA1FD);
-		XMinus<0x544727/*, 0x544727*/>::Hook(0x54474D); // Don't patch Y as we're doing it in the credits scale fix
+		XY<0x5FA1F6, 0x5FA1D5, MusicManager>::Hook(0x5FA1FD);
+		XMinus<0x544727/*, 0x544727*/, Stuff2d>::Hook(0x54474D); // Don't patch Y as we're doing it in the credits scale fix
 	}
 
 	// Mouse fucking fix!
@@ -2206,9 +2351,10 @@ void Patch_VC_11(uint32_t width, uint32_t height)
 
 	{
 		using namespace PrintStringShadows;
+		using namespace UIScales;
 
-		XY<0x5FA216, 0x5FA1F5>::Hook(0x5FA21D);
-		XMinus<0x544747/*, 0x544747*/>::Hook(0x54476D); // Don't patch Y as we're doing it in the credits scale fix
+		XY<0x5FA216, 0x5FA1F5, MusicManager>::Hook(0x5FA21D);
+		XMinus<0x544747/*, 0x544747*/, Stuff2d>::Hook(0x54476D); // Don't patch Y as we're doing it in the credits scale fix
 	}
 
 	// Mouse fucking fix!
@@ -2281,9 +2427,10 @@ void Patch_VC_Steam(uint32_t width, uint32_t height)
 
 	{
 		using namespace PrintStringShadows;
+		using namespace UIScales;
 
-		XY<0x5F9E56, 0x5F9E35>::Hook(0x5F9E5D);
-		XMinus<0x544617/*, 0x544617*/>::Hook(0x54463D); // Don't patch Y as we're doing it in the credits scale fix
+		XY<0x5F9E56, 0x5F9E35, MusicManager>::Hook(0x5F9E5D);
+		XMinus<0x544617/*, 0x544617*/, Stuff2d>::Hook(0x54463D); // Don't patch Y as we're doing it in the credits scale fix
 	}
 
 	// Mouse fucking fix!

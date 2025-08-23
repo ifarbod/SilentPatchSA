@@ -83,8 +83,8 @@ public:
     virtual void	SpecialEntityCalcCollisionSteps();
     virtual void	PreRender();
     virtual void	Render();
-    virtual void	SetupLighting();
-    virtual void	RemoveLighting(bool bRemove=true);
+    virtual bool	SetupLighting();
+    virtual void	RemoveLighting(bool bRemove);
     virtual void	FlagToDestroyWhenNextProcessed();
 
 //private:
