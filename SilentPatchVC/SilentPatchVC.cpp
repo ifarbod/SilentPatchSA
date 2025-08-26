@@ -638,6 +638,31 @@ namespace SlidingTextsScalingFixes
 }
 
 
+// ============= Fix CDarkel sliding text =============
+namespace DarkelTextPlacement
+{
+	template<std::size_t Index>
+	static void (*orgPrintString)(float,float,const wchar_t*);
+
+	template<std::size_t Index>
+	static void PrintString_ScaleY(float fX, float fY, const wchar_t* pText)
+	{
+		// The origin of this text is MaximumHeight / 2, but this function is called for two distinct texts
+		// We need to distinguish them by the X coordinate
+		if (fX == RsGlobal->MaximumWidth / 2)
+		{
+			const int origin = RsGlobal->MaximumHeight / 2;
+			fY -= origin;
+			fY *= UIScales::Darkel::Height();
+			fY += origin;
+		}
+		orgPrintString<Index>(fX, fY, pText);
+	}
+
+	HOOK_EACH_INIT(PrintString, orgPrintString, PrintString_ScaleY);
+}
+
+
 // ============= Minimal HUD changes =============
 namespace MinimalHUD
 {
@@ -2176,6 +2201,20 @@ void InjectDelayedPatches_VC_Common( bool bHasDebugMenu, const wchar_t* wcModule
 			}
 		}
 		TXN_CATCH();
+	}
+	TXN_CATCH();
+
+
+	// Fix CDarkel sliding text
+	try
+	{
+		using namespace DarkelTextPlacement;
+
+		std::array<void*, 1> darkel_print_string = {
+			get_pattern("E8 ? ? ? ? 83 C4 0C 83 C4 28 5D "),
+		};
+
+		HookEach_PrintString(darkel_print_string, InterceptCall);
 	}
 	TXN_CATCH();
 

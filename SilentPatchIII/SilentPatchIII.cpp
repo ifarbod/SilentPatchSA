@@ -1270,6 +1270,82 @@ namespace SlidingTextsScalingFixes
 	};
 }
 
+// ============= Fix CDarkel sliding text =============
+namespace DarkelTextPlacement
+{
+	template<std::size_t Index>
+	static void (*orgPrintString)(float,float,const wchar_t*);
+
+	template<std::size_t Index>
+	static void PrintString_ScaleY(float fX, float fY, const wchar_t* pText)
+	{
+		// The origin of this text is MaximumHeight / 2, but this function is called for two distinct texts
+		// We need to distinguish them by the X coordinate
+		if (fX == RsGlobal->MaximumWidth / 2)
+		{
+			const int origin = RsGlobal->MaximumHeight / 2;
+			fY -= origin;
+			fY *= UIScales::Darkel::Height();
+			fY += origin;
+		}
+		orgPrintString<Index>(fX, fY, pText);
+	}
+
+	HOOK_EACH_INIT(PrintString, orgPrintString, PrintString_ScaleY);
+}
+
+
+// ============= Fix CGarages vertical text position =============
+namespace GaragesTextPlacement
+{
+	template<std::size_t Index>
+	static const float* orgYOffset;
+
+	template<std::size_t Index>
+	static float YOffset_Recalculated;
+
+	template<std::size_t... I>
+	static void RecalculateYOffset(std::index_sequence<I...>)
+	{
+		const float multiplier = UIScales::Stuff2d::Height();
+		((YOffset_Recalculated<I> = *orgYOffset<I> * multiplier), ...);
+	}
+
+	static void (*orgSetFontStyle)(short);
+
+	template<std::size_t NumYOffset>
+	static void SetFontStyle_RecalculateOffset(short style)
+	{
+		RecalculateYOffset(std::make_index_sequence<NumYOffset>{});
+		orgSetFontStyle(style);
+	}
+
+	HOOK_EACH_INIT(YOffset, orgYOffset, YOffset_Recalculated);
+}
+
+
+// ============= Fix "Welcome to" island loading splash X position not scaling to resolution =============
+namespace IslandSplashTextPositionFix
+{
+	template<std::size_t Index>
+	static void (*orgPrintString)(float,float,const wchar_t*);
+
+	template<std::size_t Index>
+	static void PrintString_ScaleX(float fX, float fY, const wchar_t* pText)
+	{
+		// The origin of this text is MaximumWidth
+		const int origin = RsGlobal->MaximumWidth;
+		fX -= origin;
+		fX *= UIScales::Stuff2d::Width();
+		fX += origin;
+
+		orgPrintString<Index>(fX, fY, pText);
+	}
+
+	HOOK_EACH_INIT(PrintString, orgPrintString, PrintString_ScaleX);
+}
+
+
 // ============= Rsstore the 'brakelights' dummy as it's vanished from the III PC code =============
 namespace BrakelightsDummy
 {
@@ -1368,11 +1444,26 @@ namespace TextRectPaddingScalingFixes
 // ============= Fix menu texts not scaling to resolution =============
 namespace MenuManagerScalingFixes
 {
+	template<std::size_t Index>
 	static void (*orgPrintString)(float,float,const wchar_t*);
+
+	template<std::size_t Index>
 	static void PrintString_Scale(float fX, float fY, const wchar_t* pText)
 	{
-		orgPrintString(fX * UIScales::MenuManager::Width(), fY * UIScales::MenuManager::Height(), pText);
+		orgPrintString<Index>(fX * UIScales::MenuManager::Width(), fY * UIScales::MenuManager::Height(), pText);
 	}
+
+	static float** pBriefTextOriginY;
+
+	template<std::size_t Index>
+	static void PrintString_Brief(float fX, float fY, const wchar_t* pText)
+	{
+		const float originY = **pBriefTextOriginY;
+		orgPrintString<Index>(fX * UIScales::MenuManager::Width(), fY - originY + (originY * UIScales::MenuManager::Height()), pText);
+	}
+
+	HOOK_EACH_INIT_CTR(MenuText, 0, orgPrintString, PrintString_Scale);
+	HOOK_EACH_INIT_CTR(Brief, 1, orgPrintString, PrintString_Brief);
 }
 
 
@@ -1731,6 +1822,60 @@ void InjectDelayedPatches_III_Common( bool bHasDebugMenu, const wchar_t* wcModul
 	TXN_CATCH();
 
 
+	// Fix CDarkel sliding text
+	try
+	{
+		using namespace DarkelTextPlacement;
+
+		std::array<void*, 1> darkel_print_string = {
+			get_pattern("E8 ? ? ? ? 83 C4 0C 83 C4 28 5D "),
+		};
+
+		HookEach_PrintString(darkel_print_string, InterceptCall);
+	}
+	TXN_CATCH();
+
+
+	// Fix CGarages vertical text position
+	try
+	{
+		using namespace GaragesTextPlacement;
+
+		auto print_messages_y1 = pattern("D8 25 ? ? ? ? D9 1C 24 A1 ? ? ? ? 3D 00 00 00 80").count(3);
+		auto print_messages_y2 = get_pattern<float*>("DB 44 24 04 D8 25", 4 + 2);
+
+		auto set_font_style = get_pattern("E8 ? ? ? ? 59 8D 4C 24 08");
+
+		std::array<float**, 4> print_messages_y = {
+
+			print_messages_y1.get(0).get<float*>(2),
+			print_messages_y1.get(1).get<float*>(2),
+			print_messages_y1.get(2).get<float*>(2),
+			print_messages_y2
+		};
+
+		HookEach_YOffset(print_messages_y, InterceptMemDisplacement);
+		InterceptCall(set_font_style, orgSetFontStyle, SetFontStyle_RecalculateOffset<print_messages_y.size()>);
+	}
+	TXN_CATCH();
+
+
+	// Fix "Welcome to" island loading splash X position not scaling to resolution
+	try
+	{
+		using namespace IslandSplashTextPositionFix;
+
+		auto print_string_pattern = pattern("DB 85 ? ? ? ? 50 D9 1C 24 E8 ? ? ? ? 83 C4 0C").count(2);
+		std::array<void*, 2> print_string = {
+			print_string_pattern.get(0).get<void>(10),
+			print_string_pattern.get(1).get<void>(10),
+		};
+
+		HookEach_PrintString(print_string, InterceptCall);
+	}
+	TXN_CATCH();
+
+
 	// Rsstore the 'brakelights' dummy as it's vanished from the III PC code
 	try
 	{
@@ -1813,15 +1958,34 @@ void InjectDelayedPatches_III_Common( bool bHasDebugMenu, const wchar_t* wcModul
 	TXN_CATCH();
 
 
-	// ============= Fix menu texts not scaling to resolution =============
-	try
+	// Fix menu texts not scaling to resolution
 	{
 		using namespace MenuManagerScalingFixes;
 
-		auto printStringMenuText = get_pattern("E8 ? ? ? ? 83 C4 0C DB 05 ? ? ? ? 50");
-		InterceptCall(printStringMenuText, orgPrintString, PrintString_Scale);
+		// Menu text
+		try
+		{
+			std::array<void*, 1> printStringMenuText = {
+				get_pattern("E8 ? ? ? ? 83 C4 0C DB 05 ? ? ? ? 50")
+			};
+
+			HookEach_MenuText(printStringMenuText, InterceptCall);
+		}
+		TXN_CATCH();
+
+		// Brief text
+		try
+		{
+			auto brief_text_origin = get_pattern<float*>("D9 05 ? ? ? ? D9 5C 24 1C BB", 2);
+			std::array<void*, 1> brief_print_string = {
+				get_pattern("FF 35 ? ? ? ? E8 ? ? ? ? 83 C4 0C 89 E9", 6)
+			};
+
+			pBriefTextOriginY = brief_text_origin;
+			HookEach_Brief(brief_print_string, InterceptCall);
+		}
+		TXN_CATCH();
 	}
-	TXN_CATCH();
 
 	FLAUtils::Init(moduleList);
 }

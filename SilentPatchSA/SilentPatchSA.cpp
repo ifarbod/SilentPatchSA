@@ -4379,12 +4379,6 @@ BOOL InjectDelayedPatches_10()
 
 		const bool bHasDebugMenu = DebugMenuLoad();
 
-		auto InterceptMemDisplacement = [](float** address, const float*& org, float& replaced)
-			{
-				org = *address;
-				Patch(address, &replaced);
-			};
-
 		const std::initializer_list<uint8_t> fadd = { 0xD8, 0x05 };
 		const std::initializer_list<uint8_t> fsub = { 0xD8, 0x25 };
 		const std::initializer_list<uint8_t> fld = { 0xD9, 0x05 };
@@ -5598,12 +5592,6 @@ void Patch_SA_10(HINSTANCE hInstance)
 #if MEM_VALIDATORS
 	InstallMemValidator();
 #endif
-
-	auto InterceptMemDisplacement = [](float** address, const float*& org, float& replaced)
-		{
-			org = *address;
-			Patch(address, &replaced);
-		};
 
 	// IsAlreadyRunning needs to be read relatively late - the later, the better
 	{
