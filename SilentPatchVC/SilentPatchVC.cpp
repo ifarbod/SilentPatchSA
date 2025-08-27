@@ -1611,6 +1611,12 @@ namespace TommyFistShakeWithWeapons
 }
 
 
+static void __fastcall ResetTimers_Dont(void* /*obj*/, void*, uint32_t /*time*/)
+{
+	// Do nothing
+}
+
+
 void InjectDelayedPatches_VC_Common( bool bHasDebugMenu, const wchar_t* wcModulePath )
 {
 	using namespace Memory;
@@ -2585,6 +2591,22 @@ void Patch_VC_Common()
 
 		InjectHook( hookPoint.get<void>( 0x21 ), CTimer::Update_SilentPatch, HookType::Call );
 		InjectHook( hookPoint.get<void>( 0x21 + 5 ), jmpPoint, HookType::Jump );
+	}
+	TXN_CATCH();
+
+
+	// Don't reset audio timers in CTimer::Initialise as that interferes with the teardown
+	try
+	{
+		std::array<void*, 2> reset_timers_to_nop = {
+			get_pattern("E8 ? ? ? ? 68 ? ? ? ? E8 ? ? ? ? 59 89 EC 5D C3"),
+			get_pattern("50 E8 ? ? ? ? E8 ? ? ? ? E8 ? ? ? ? EB 58", 1),
+		};
+
+		for (void* func : reset_timers_to_nop)
+		{
+			InjectHook(func, ResetTimers_Dont);
+		}
 	}
 	TXN_CATCH();
 
