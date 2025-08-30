@@ -395,7 +395,8 @@ namespace PrintStringShadows
 // ============= Radar position and radardisc shadow =============
 namespace RadardiscFixes
 {
-	static const float RADARDISC_SHRINK = 2.0f; // We are shrinking the radardisc by that
+	static constexpr float RADARDISC_SHRINK_DEFAULT = 2.0f; // We are shrinking the radardisc by that
+	static float RADARDISC_SHRINK = RADARDISC_SHRINK_DEFAULT;
 
 	static float* orgRadarXPosPtr;
 
@@ -2040,6 +2041,29 @@ void InjectDelayedPatches_VC_Common( bool bHasDebugMenu, const wchar_t* wcModule
 		//    Missing out on a fix is better than breaking something.
 		if (hGameModule == ModCompat::Utils::GetModuleHandleFromAddress(radarPos))
 		{
+			if (const int INIoption = GetPrivateProfileIntW(L"SilentPatch", L"DontShrinkRadardisc", -1, wcModulePath); INIoption != -1)
+			{
+				if (INIoption != 0)
+				{
+					RADARDISC_SHRINK = 0.0f;
+				}
+
+				if (bHasDebugMenu)
+				{
+					static bool bDontShrinkRadardisc = INIoption != 0;
+					DebugMenuAddVar("SilentPatch", "Don't shrink radardisc", &bDontShrinkRadardisc, [] {
+						if (bDontShrinkRadardisc)
+						{
+							RADARDISC_SHRINK = 0.0f;
+						}
+						else
+						{
+							RADARDISC_SHRINK = RADARDISC_SHRINK_DEFAULT;
+						}
+					});
+				}
+			}
+
 			static float fYouAreHereSize = *radarPos;
 			orgRadarXPosPtr = radarPos;
 
