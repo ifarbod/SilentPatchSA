@@ -247,6 +247,22 @@ namespace UIScales
 			return Height_Internal_Scale(Mult);
 		}
 	};
+
+	// CReplay
+	struct Replay
+	{
+		static float Width()
+		{
+			static float** Mult = Width_Internal("83 E0 20 0F 84 ? ? ? ? DB 05 ? ? ? ? 50 D8 0D ? ? ? ? D8 0D ? ? ? ? D9 1C 24 DB 05 ? ? ? ? 50 D8 0D", 0x26 + 2);
+			return Width_Internal_Scale(Mult);
+		}
+
+		static float Height()
+		{
+			static float** Mult = Height_Internal("83 E0 20 0F 84 ? ? ? ? DB 05 ? ? ? ? 50 D8 0D ? ? ? ? D8 0D ? ? ? ? D9 1C 24 DB 05 ? ? ? ? 50 D8 0D", 0x10 + 2);
+			return Height_Internal_Scale(Mult);
+		}
+	};
 }
 
 // ============= Scale the radar trace (blip) to resolution =============
@@ -295,9 +311,16 @@ namespace ScalingFixes
 		orgSetScale<Index>(fX * UIScales::Stuff2d::Width(), fY * UIScales::Stuff2d::Height());
 	}
 
+	template<std::size_t Index>
+	static void SetScale_FontInitialise(float fX, float fY)
+	{
+		orgSetScale<Index>(fX * UIScales::Stuff2d::Width(), fY * UIScales::Stuff2d::Height());
+	}
+
 	HOOK_EACH_INIT_CTR(SetScale_Pickups, 0, orgSetScale, SetScale_Pickups);
 	HOOK_EACH_INIT_CTR(SetScale_Darkel, 1, orgSetScale, SetScale_Darkel);
 	HOOK_EACH_INIT_CTR(SetScale_Garages, 2, orgSetScale, SetScale_Garages);
+	HOOK_EACH_INIT_CTR(SetScale_FontInitialise, 3, orgSetScale, SetScale_FontInitialise);
 
 
 	// Fixed subtitle shadows
@@ -1071,7 +1094,7 @@ namespace FixedBrightnessSaving
 		{
 			return result;
 		}
-		
+
 		if (tmp == 0 || tmp >= 31)
 		{
 			*brightness = 256 + tmp;
@@ -1245,7 +1268,17 @@ namespace SlidingTextsScalingFixes
 			orgPrintString<Index>(fX, fY, pText);
 		}
 
+		template<std::size_t Index>
+		static void (*orgSetRightJustifyWrap)(float wrap);
+
+		template<std::size_t Index>
+		static void SetRightJustifyWrap_Slide(float wrap)
+		{
+			orgSetRightJustifyWrap<Index>(wrap * UIScales::HudMessages::Width());
+		}
+
 		HOOK_EACH_INIT(PrintString, orgPrintString, PrintString_Slide);
+		HOOK_EACH_INIT(RightJustifyWrap, orgSetRightJustifyWrap, SetRightJustifyWrap_Slide);
 	};
 
 	struct OddJob2Slider
@@ -1346,6 +1379,82 @@ namespace IslandSplashTextPositionFix
 }
 
 
+// ============= Fixed most line wraps not scaling to resolution =============
+namespace FixedLineWraps
+{
+	// Can be SetWrapx, SetRightJustifyWrap, or SetCentreSize
+	template<typename Scaler>
+	struct WrapInternal
+	{
+		template<std::size_t Index>
+		static void (*orgWrapFunction)(float);
+
+		template<std::size_t Index>
+		static void WrapFunction_LeftAlign(float fLength)
+		{
+			orgWrapFunction<Index>(fLength * Scaler::Width());
+		}
+
+		template<std::size_t Index>
+		static void WrapFunction_RightAlign(float fLength)
+		{
+			const int origin = RsGlobal->MaximumWidth;
+
+			fLength -= origin;
+			fLength *= Scaler::Width();
+			fLength += origin;
+
+			orgWrapFunction<Index>(fLength);
+		}
+
+		template<std::size_t Index>
+		static void WrapFunction_FullWidth(float /*fLength*/)
+		{
+			orgWrapFunction<Index>(static_cast<float>(RsGlobal->MaximumWidth));
+		}
+	};
+
+	struct MenuManager : public WrapInternal<UIScales::MenuManager>
+	{
+		HOOK_EACH_INIT_CTR(Draw_Left, 0, orgWrapFunction, WrapFunction_LeftAlign);
+		HOOK_EACH_INIT_CTR(Draw_Right, 1, orgWrapFunction, WrapFunction_RightAlign);
+
+		HOOK_EACH_INIT_CTR(DrawPlayerSetupScreen_Left, 10, orgWrapFunction, WrapFunction_LeftAlign);
+		HOOK_EACH_INIT_CTR(DrawPlayerSetupScreen_Right, 11, orgWrapFunction, WrapFunction_RightAlign);
+	};
+
+	struct Font : public WrapInternal<void>
+	{
+		HOOK_EACH_INIT_CTR(Initialise_FullWidth, 0, orgWrapFunction, WrapFunction_FullWidth);
+	};
+
+	struct Darkel : public WrapInternal<UIScales::Darkel>
+	{
+		HOOK_EACH_INIT_CTR(DrawMessages_Right, 0, orgWrapFunction, WrapFunction_RightAlign);
+	};
+
+	struct Garages : public WrapInternal<UIScales::Stuff2d>
+	{
+		HOOK_EACH_INIT_CTR(PrintMessages_Right, 0, orgWrapFunction, WrapFunction_RightAlign);
+	};
+
+	struct Credits : public WrapInternal<UIScales::Stuff2d>
+	{
+		HOOK_EACH_INIT_CTR(Render_Right, 0, orgWrapFunction, WrapFunction_RightAlign);
+	};
+
+	struct LoadingIslandScreen : public WrapInternal<UIScales::Stuff2d>
+	{
+		HOOK_EACH_INIT_CTR(Display_Left, 0, orgWrapFunction, WrapFunction_LeftAlign);
+	};
+
+	struct Replay : public WrapInternal<UIScales::Replay>
+	{
+		HOOK_EACH_INIT_CTR(Display_Right, 0, orgWrapFunction, WrapFunction_RightAlign);
+	};
+}
+
+
 // ============= Rsstore the 'brakelights' dummy as it's vanished from the III PC code =============
 namespace BrakelightsDummy
 {
@@ -1364,7 +1473,7 @@ namespace BrakelightsDummy
 	{
 		// We are given a pointer to CAR_POS_TAILLIGHTS (ID 1), but we want CAR_POS_BRAKELIGHTS (ID 4), synthesise one
 		const CVector* brakeLights = reinterpret_cast<const CVector*>(vec + 3*sizeof(CVector));
-		
+
 		// If all 3 components are 0.0, assume it's a modded vehicle and fall back to the stock dummy
 		if (brakeLights->x == 0.0f && brakeLights->y == 0.0f && brakeLights->z == 0.0f)
 		{
@@ -1513,7 +1622,7 @@ void InjectDelayedPatches_III_Common( bool bHasDebugMenu, const wchar_t* wcModul
 			static const char * const str[] = { "Default", "Metric", "Imperial" };
 			DebugMenuEntry *e = DebugMenuAddVar( "SilentPatch", "Forced units", &forcedUnits, nullptr, 1, -1, 1, str );
 			DebugMenuEntrySetWrap(e, true);
-		}			
+		}
 	}
 
 	// Make crane be unable to lift Coach instead of Blista
@@ -1789,9 +1898,14 @@ void InjectDelayedPatches_III_Common( bool bHasDebugMenu, const wchar_t* wcModul
 				get_pattern("E8 ? ? ? ? 83 C4 0C EB 0A C7 05 ? ? ? ? ? ? ? ? 83 C4 68"),
 			};
 
+			std::array<void*, 1> textWrapFix = {
+				get_pattern("E8 ? ? ? ? 59 E8 ? ? ? ? 6A 02 E8 ? ? ? ? A1"),
+			};
+
 			BigMessageSlider<1>::pHorShadowValue = bigMessage1ShadowPrint.get<float*>(2);
 			BigMessageSlider<1>::bSlidingEnabled = INIoption != 0;
 			BigMessageSlider<1>::HookEach_PrintString(slidingMessage1, InterceptCall);
+			BigMessageSlider<1>::HookEach_RightJustifyWrap(textWrapFix, InterceptCall);
 
 			if (bHasDebugMenu)
 			{
@@ -2077,7 +2191,7 @@ void Patch_III_10(uint32_t width, uint32_t height)
 
 	// Armour cheat as TORTOISE - like in 1.1 and Steam
 	Patch<const char*>(0x4925FB, "ESIOTROT");
-	
+
 	// BOOOOORING fixed
 	Patch<BYTE>(0x4925D7, 10);
 
@@ -2389,7 +2503,7 @@ void Patch_III_Common()
 		static const float METERS_TO_MILES = 0.0006213711922f;
 		static const float METERS_TO_FEET = 3.280839895f;
 		auto addr = pattern( "D8 0D ? ? ? ? 6A 00 6A 01 D9 9C 24" ).count(4);
-		
+
 		Patch<const void*>( addr.get(0).get<void>( 2 ), &METERS_TO_MILES );
 		Patch<const void*>( addr.get(1).get<void>( 2 ), &METERS_TO_MILES );
 
@@ -2573,7 +2687,7 @@ void Patch_III_Common()
 	{
 		auto initHelis = pattern( "C6 40 2C 00 A1" ).get_one();
 
-		static constexpr CColModel colModelChopper( CColSphere( 8.5f, CVector(0.0f, -1.75f, 0.73f), 0, 0 ), 
+		static constexpr CColModel colModelChopper( CColSphere( 8.5f, CVector(0.0f, -1.75f, 0.73f), 0, 0 ),
 						CColBox( CVector(-2.18f, -8.52f, -0.67f), CVector(-2.18f, 4.58f, 2.125f), 0, 0 ) );
 
 		Patch( initHelis.get<void>( -7 + 3 ), &colModelChopper );
@@ -2633,7 +2747,7 @@ void Patch_III_Common()
 	try
 	{
 		auto setEnvironmentMap = get_pattern("C7 83 D8 01 00 00 00 00 00 00 E8", 10);
-	
+
 		InterceptCall(setEnvironmentMap, CVehicleModelInfo::orgSetEnvironmentMap, &CVehicleModelInfo::SetEnvironmentMap_ExtraComps);
 	}
 	TXN_CATCH();
@@ -2849,6 +2963,126 @@ void Patch_III_Common()
 		InterceptCall(write, orgWrite, Write_Brightness);
 	}
 	TXN_CATCH();
+
+
+	// Fixed most line wraps not scaling to resolution
+	// Shared namespace, but separate patch applications per-function
+	{
+		using namespace FixedLineWraps;
+
+		// CMenuManager::Draw
+		try
+		{
+			auto menu_manager_draw = pattern("E8 ? ? ? ? 59 FF 35 ? ? ? ? E8 ? ? ? ? 8B 85").get_one();
+
+			std::array<void*, 1> right_align = {
+				menu_manager_draw.get<void>()
+			};
+
+			std::array<void*, 1> left_align = {
+				menu_manager_draw.get<void>(0xC)
+			};
+
+			MenuManager::HookEach_Draw_Right(right_align, InterceptCall);
+			MenuManager::HookEach_Draw_Left(left_align, InterceptCall);
+		}
+		TXN_CATCH();
+
+		// CMenuManager::DrawPlayerSetupScreen & CMenuManager::DrawControllerSetupScreen
+		try
+		{
+			auto draw_screen = pattern("E8 ? ? ? ? 59 FF 35 ? ? ? ? E8 ? ? ? ? 59 89 E9").count(2);
+			std::array<void*, 2> right_align = {
+				draw_screen.get(0).get<void>(),
+				draw_screen.get(1).get<void>()
+			};
+
+			std::array<void*, 2> left_align = {
+				draw_screen.get(0).get<void>(0xC),
+				draw_screen.get(1).get<void>(0xC),
+			};
+
+			MenuManager::HookEach_DrawPlayerSetupScreen_Right(right_align, InterceptCall);
+			MenuManager::HookEach_DrawPlayerSetupScreen_Left(left_align, InterceptCall);
+		}
+		TXN_CATCH();
+
+		// CFont::Initialise
+		try
+		{
+			// Also fix default scaling while we're at it
+			auto initialise_wrap_pattern = pattern("E8 ? ? ? ? 59 FF 35 ? ? ? ? E8 ? ? ? ? 59 E8 ? ? ? ? 8D 4C 24 04 68 80 00 00 00 68 80 00 00 00 68 80 00 00 00 68 80 00 00 00").get_one();
+
+			std::array<void*, 1> initialise_scale = {
+				get_pattern("E8 ? ? ? ? DB 05 ? ? ? ? 59 59")
+			};
+
+			std::array<void*, 2> initialise_wrap = {
+				initialise_wrap_pattern.get<void>(),
+				initialise_wrap_pattern.get<void>(0xC)
+			};
+
+			ScalingFixes::HookEach_SetScale_FontInitialise(initialise_scale, InterceptCall);
+			Font::HookEach_Initialise_FullWidth(initialise_wrap, InterceptCall);
+		}
+		TXN_CATCH();
+
+		// CDarkel::DrawMessages
+		try
+		{
+			std::array<void*, 2> set_centre_size = {
+				get_pattern("E8 ? ? ? ? 59 E8 ? ? ? ? E8 ? ? ? ? A1"),
+				get_pattern("D9 1C 24 E8 ? ? ? ? 59 E8 ? ? ? ? B9", 3)
+			};
+
+			Darkel::HookEach_DrawMessages_Right(set_centre_size, InterceptCall);
+		}
+		TXN_CATCH();
+
+		// CGarages::PrintMessages
+		try
+		{
+			std::array<void*, 1> set_centre_size = {
+				get_pattern("E8 ? ? ? ? 59 E8 ? ? ? ? 6A 00 E8 ? ? ? ? 59 8D 4C 24 08")
+			};
+
+			Garages::HookEach_PrintMessages_Right(set_centre_size, InterceptCall);
+		}
+		TXN_CATCH();
+
+		// CCredits::Render
+		try
+		{
+			std::array<void*, 1> set_centre_size = {
+				get_pattern("E8 ? ? ? ? 59 E8 ? ? ? ? E8 ? ? ? ? 68")
+			};
+
+			FixedLineWraps::Credits::HookEach_Render_Right(set_centre_size, InterceptCall);
+		}
+		TXN_CATCH();
+
+		// LoadingIslandScreen
+		try
+		{
+			std::array<void*, 1> set_right_justify_wrap = {
+				get_pattern("E8 ? ? ? ? 59 6A 02 E8 ? ? ? ? 59 FF 75 08 68")
+			};
+
+			LoadingIslandScreen::HookEach_Display_Left(set_right_justify_wrap, InterceptCall);
+		}
+		TXN_CATCH();
+
+		// CReplay::Display
+		try
+		{
+			std::array<void*, 1> set_centre_size = {
+				get_pattern("D9 1C 24 E8 ? ? ? ? 59 59 E8 ? ? ? ? E8 ? ? ? ? A1 ? ? ? ? 83 C0 EC 89 04 24 50 DB 44 24 04 D9 1C 24 E8", 0x27)
+			};
+
+			FixedLineWraps::Replay::HookEach_Display_Right(set_centre_size, InterceptCall);
+		}
+		TXN_CATCH();
+	}
 }
 
 BOOL WINAPI DllMain(HINSTANCE hinstDLL, DWORD fdwReason, LPVOID lpvReserved)

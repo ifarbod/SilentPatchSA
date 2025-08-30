@@ -164,7 +164,7 @@ RwMatrix* RwMatrixTranslate(RwMatrix* matrix, const RwV3d* translation, RwOpComb
 	{
 		matrix->pos.x += matrix->at.x * translation->z + matrix->up.x * translation->y + matrix->right.x * translation->x;
 		matrix->pos.y += matrix->at.y * translation->z + matrix->up.y * translation->y + matrix->right.y * translation->x;
-		matrix->pos.z += matrix->at.z * translation->z + matrix->up.z * translation->y + matrix->right.z * translation->x;	
+		matrix->pos.z += matrix->at.z * translation->z + matrix->up.z * translation->y + matrix->right.z * translation->x;
 	}
 	else if ( combineOp == rwCOMBINEPOSTCONCAT )
 	{
@@ -340,7 +340,7 @@ struct RsGlobalType
 // Other wrappers
 void					(*GTAdelete)(void*) = AddressByVersion<void(*)(void*)>(0x82413F, 0x824EFF, 0x85E58C);
 const char*				(*GetFrameNodeName)(RwFrame*) = AddressByVersion<const char*(*)(RwFrame*)>(0x72FB30, 0x730360, 0x769C20, { "55 8B EC A1 ? ? ? ? 85 C0 7E 05 03 45 08 5D C3", 0 });
-RpHAnimHierarchy*		(*GetAnimHierarchyFromSkinClump)(RpClump*) = AddressByVersion<RpHAnimHierarchy*(*)(RpClump*)>(0x734A40, 0x735270, 0x7671B0);	
+RpHAnimHierarchy*		(*GetAnimHierarchyFromSkinClump)(RpClump*) = AddressByVersion<RpHAnimHierarchy*(*)(RpClump*)>(0x734A40, 0x735270, 0x7671B0);
 auto					InitializeUtrax = AddressByVersion<void(__thiscall*)(void*)>(0x4F35B0, 0x4F3A10, 0x4FFA80);
 auto					RpAnimBlendClumpGetAssociation = AddressByVersion<CAnimBlendAssociation*(*)(RpClump*, uint32_t)>(0x4D68B0, { "8B 0D ? ? ? ? 8B 14 01 8B 02 85 C0 74 11 8B 4D 0C", -6 });
 auto					GetAnimationBlockIndex = AddressByVersion<int32_t(*)(const char* animBlock)>(0x4D3990, 0x4D3B80, 0x4DE2F0, { "83 C4 04 85 C0 75 05", -0xC });
@@ -350,7 +350,7 @@ auto					ClearAtomicFlag = AddressByVersion<void(*)(RpAtomic*, int)>(0x732310, 0
 
 auto					IsPlayerOnAMission = AddressByVersion<bool(*)()>(0x464D50, {"85 C0 74 0C 83 B8 ? ? ? ? ? 75 03 B0 01 C3", -5});
 
-static void				(__thiscall* SetVolume)(void*,float);	
+static void				(__thiscall* SetVolume)(void*,float);
 static BOOL				(*IsAlreadyRunning)();
 static void				(*TheScriptsLoad)();
 static void				(*DoSunAndMoon)();
@@ -729,12 +729,50 @@ namespace UIScales
 		}
 	};
 
+	// CReplay
+	struct Replay
+	{
+		static float Width_Multiply()
+		{
+			static float** Mult = (float**)(0x45C255 + 2);
+			return Width_Internal_Multiply(Mult);
+		}
+
+		static float Height_Multiply()
+		{
+			static float** Mult = (float**)(0x45C23F + 2);
+			return Height_Internal_Multiply(Mult);
+		}
+
+		static float Width_Divide()
+		{
+			static double** Div = Width_Internal("DC 35 ? ? ? ? DE C9 D9 5D FC", 2);
+			return Width_Internal_Divide(Div);
+		}
+
+		static float Height_Divide()
+		{
+			static double** Div = Height_Internal("83 EC 08 DC 35 ? ? ? ? DD 05", 3 + 2);
+			return Height_Internal_Divide(Div);
+		}
+
+		static inline auto Width = &Width_Multiply;
+		static inline auto Height = &Height_Multiply;
+
+		static void NewBinaries()
+		{
+			Width = &Width_Divide;
+			Height = &Height_Divide;
+		}
+	};
+
 	static void NewBinaries()
 	{
 		HudMessages::NewBinaries();
 		Stuff2d::NewBinaries();
 		MenuManager::NewBinaries();
 		Font::NewBinaries();
+		Replay::NewBinaries();
 	}
 }
 
@@ -966,7 +1004,7 @@ static void AirRaidFix()
 			assembleCommand(afterMissionSpace, { 0x8B, 0x03 }); // LOAD_ALL_MODELS_NOW
 			assembleCommand(afterMissionSpace, { 0xB2, 0x01, 0x02, 0x0C, 0x00, 0x03, 0x72, 0x01, 0x03, 0x73, 0x01 });  // GIVE_WEAPON_TO_CHAR scplayer weapontype_zero1 ammo_zero1
 			assembleCommand(afterMissionSpace, { 0x49, 0x02, 0x03, 0x74, 0x01 }); // MARK_MODEL_AS_NO_LONGER_NEEDED model_for_weapon_zero1
-			
+
 			assembleCommand(afterMissionSpace, { 0x02, 0x00, 0x01 }); // GOTO originalMissionCleanup
 			assembleInt32(afterMissionSpace, originalMissionCleanup);
 		}
@@ -1072,7 +1110,7 @@ bool GetCurrentZoneLockedOrUnlocked(float fPosX, float fPosY)
 	// "Territories fix"
 	if ( (Xindex >= 0 && Xindex < GridXNum) && (Yindex >= 0 && Yindex < GridYNum) )
 		return ZonesVisited[GridXNum*Xindex - Yindex + (GridYNum-1)] != 0;
-	
+
 	// Outside of map bounds
 	return true;
 }
@@ -1138,7 +1176,7 @@ void DrawRect_HalfPixel_Steam(CRect& rect, const CRGBA& rgba)
 
 char* GetMyDocumentsPathSA()
 {
-	static char* const pDocumentsPath = [&] () -> char* {	
+	static char* const pDocumentsPath = [&] () -> char* {
 		static char	cUserFilesPath[MAX_PATH];
 		char* const ppTempBufPtr = Memory::GetVersion().version == 0 ? *AddressByRegion_10<char**>(0x744FE5) : cUserFilesPath;
 
@@ -1403,7 +1441,7 @@ CVehicleModelInfo* (__thiscall *orgVehicleModelInfoInit)(CVehicleModelInfo*);
 CVehicleModelInfo* __fastcall VehicleModelInfoInit(CVehicleModelInfo* me)
 {
 	orgVehicleModelInfoInit(me);
-	
+
 	// Hack to satisfy some null checks
 	static uintptr_t DUMMY;
 	me->__removedInSilentPatch = &DUMMY;
@@ -1500,7 +1538,7 @@ public:
 	}
 
 	void Lock() const { EnterCriticalSection( &m_critSec ); }
-	void Unlock() const { LeaveCriticalSection( &m_critSec ); } 
+	void Unlock() const { LeaveCriticalSection( &m_critSec ); }
 
 	CRITICAL_SECTION* Get() const { return &m_critSec; }
 
@@ -1643,7 +1681,7 @@ static void CdStreamInitThread()
 		CdStreamInitializeSyncObject = Sema::InitializeSyncObject;
 		CdStreamShutdownSyncObject = Sema::ShutdownSyncObject;
 		CdStreamSyncOnObject = Sema::CdStreamSync;
-		CdStreamThreadOnObject = Sema::CdStreamThread;		
+		CdStreamThreadOnObject = Sema::CdStreamThread;
 	}
 
 	InitializeCriticalSection( &CdStreamCritSec );
@@ -2002,7 +2040,7 @@ namespace VariableResets
 		ReInitOurVariables();
 		orgReInitGameObjectVariables<Index>();
 
-		// Then after the normal restart, re-instate pickups, car generators and stunt jumps from text IPLs as they have been 
+		// Then after the normal restart, re-instate pickups, car generators and stunt jumps from text IPLs as they have been
 		ReloadObjectDefinitionsAfterReinit();
 	}
 	HOOK_EACH_INIT(ReInitGameObjectVariables, orgReInitGameObjectVariables, ReInitGameObjectVariables);
@@ -2197,7 +2235,7 @@ namespace MoonphasesFix
 	static void RenderOneXLUSprite_MoonPhases( float arg1, float arg2, float arg3, float arg4, float arg5, uint8_t red, uint8_t green, uint8_t blue, int16_t mult, float arg10, uint8_t alpha, uint8_t arg12, uint8_t arg13 )
 	{
 		static RwTexture*	gpMoonMask = [] () {
-			
+
 			// load from file
 			RwTexture* mask = CPNGFile::ReadFromFile("lunar.png");
 			if (mask == nullptr)
@@ -2971,7 +3009,7 @@ namespace NewResolutionSelectionDialog
 		HWND hCheckbox = GetDlgItem(hDlg, IDC_REMEMBERRESCHOICE);
 		HWND hwndTip = CreateWindowEx(WS_EX_TOPMOST, TOOLTIPS_CLASS, NULL, WS_POPUP | TTS_ALWAYSTIP, CW_USEDEFAULT, CW_USEDEFAULT, CW_USEDEFAULT, CW_USEDEFAULT,
 						hDlg, nullptr, hInstance, nullptr);
-		
+
 		if (hCheckbox == nullptr || hwndTip == nullptr)
 		{
 			return;
@@ -3064,7 +3102,7 @@ namespace NewResolutionSelectionDialog
 		actCtx.hModule = reinterpret_cast<HMODULE>(&__ImageBase);
 		actCtx.lpResourceName = MAKEINTRESOURCE(2);
 		actCtx.dwFlags = ACTCTX_FLAG_HMODULE_VALID | ACTCTX_FLAG_RESOURCE_NAME_VALID;
-		
+
 		ULONG_PTR cookie = 0;
 		bool bContextActivated = false;
 
@@ -3123,7 +3161,7 @@ namespace CreditsScalingFixes
 	{
 		using namespace UIScales;
 		if constexpr (Index == 1)
-		{	
+		{
 			// Fix the shadow X scale - the Y scale will be fixed below
 			fX = fX + 1.0f - Stuff2d::Width();
 		}
@@ -3298,7 +3336,7 @@ namespace CrosshairScalingFixes
 // ============= Fix Map screen boundaries and the cursor not scaling to resolution =============
 // Debugged by Wesser
 namespace MapScreenScalingFixes
-{	
+{
 	__declspec(naked) void ScaleX_NewBinaries()
 	{
 		_asm
@@ -3365,7 +3403,7 @@ namespace MapScreenScalingFixes
 		*x *= XScale;
 		*y *= YScale;
 		orgLimitToMap_Scale(x, y);
-		
+
 		*x /= XScale;
 		*y /= YScale;
 	}
@@ -3443,7 +3481,7 @@ namespace TextRectPaddingScalingFixes
 		RecalculateYSize_Double(std::make_index_sequence<NumYSizeDouble>{});
 		return orgProcessCurrentString(a1, a2, a3, a4);
 	}
-	
+
 	HOOK_EACH_INIT(PaddingXSize, orgPaddingXSize, PaddingXSize_Recalculated);
 	HOOK_EACH_INIT(PaddingYSize, orgPaddingYSize, PaddingYSize_Recalculated);
 	HOOK_EACH_INIT(PaddingYSize_Double, orgPaddingYSize_Double, PaddingYSize_Double_Recalculated);
@@ -3536,6 +3574,57 @@ namespace SkimmerVehiclesIdeFix
 	}
 }
 
+// ============= Fixed most line wraps not scaling to resolution =============
+namespace FixedLineWraps
+{
+	// Can be SetWrapx, SetRightJustifyWrap, or SetCentreSize
+	template<typename Scaler>
+	struct WrapInternal
+	{
+		template<std::size_t Index>
+		static void (*orgWrapFunction)(float);
+
+		template<std::size_t Index>
+		static void WrapFunction_LeftAlign(float fLength)
+		{
+			orgWrapFunction<Index>(fLength * Scaler::Width());
+		}
+
+		template<std::size_t Index>
+		static void WrapFunction_RightAlign(float fLength)
+		{
+			const int origin = RsGlobal->MaximumWidth;
+
+			fLength -= origin;
+			fLength *= Scaler::Width();
+			fLength += origin;
+
+			orgWrapFunction<Index>(fLength);
+		}
+
+		template<std::size_t Index>
+		static void WrapFunction_FullWidth(float /*fLength*/)
+		{
+			orgWrapFunction<Index>(static_cast<float>(RsGlobal->MaximumWidth));
+		}
+	};
+
+	struct MenuManager : public WrapInternal<UIScales::MenuManager>
+	{
+		HOOK_EACH_INIT_CTR(PrintMap_Left, 0, orgWrapFunction, WrapFunction_LeftAlign);
+		HOOK_EACH_INIT_CTR(PrintMap_Right, 1, orgWrapFunction, WrapFunction_RightAlign);
+		HOOK_EACH_INIT_CTR(PrintMap_FullWidth, 2, orgWrapFunction, WrapFunction_FullWidth);
+
+		HOOK_EACH_INIT_CTR(DrawStandardMenus_Left, 10, orgWrapFunction, WrapFunction_LeftAlign);
+		HOOK_EACH_INIT_CTR(DrawStandardMenus_Right, 11, orgWrapFunction, WrapFunction_RightAlign);
+	};
+
+	struct Replay : public WrapInternal<UIScales::Replay>
+	{
+		HOOK_EACH_INIT_CTR(Display_Right, 0, orgWrapFunction, WrapFunction_RightAlign);
+	};
+}
+
 // ============= LS-RP Mode stuff =============
 namespace LSRPMode
 {
@@ -3607,7 +3696,7 @@ namespace LSRPMode
 		{
 			int ip[4] = {};
 			int port = 0;
-			
+
 			// IP is mandatory, port is optional
 			int argsRead = swscanf_s( str, L"%d.%d.%d.%d", &ip[0], &ip[1], &ip[2], &ip[3] );
 			if ( argsRead == 4 )
@@ -4276,7 +4365,7 @@ __declspec(naked) void WeaponRangeMult_VehicleCheck()
 		jz		WeaponRangeMult_VehicleCheck_NotInCar
 		mov		eax, [edx]CPed.pVehicle
 		ret
-	
+
 	WeaponRangeMult_VehicleCheck_NotInCar:
 		xor		eax, eax
 		ret
@@ -4403,7 +4492,7 @@ BOOL InjectDelayedPatches_10()
 				Patch<const void*>(0x6FC5AA, &fSunFarClip);
 			}
 		}
-		
+
 		if ( !bSARender )
 		{
 			// Alpha render states on rotors and propellers
@@ -4463,7 +4552,7 @@ BOOL InjectDelayedPatches_10()
 
 			// Basketball fix
 			InterceptCall( 0x5D18F0, TheScriptsLoad, TheScriptsLoad_BasketballFix );
-			
+
 			std::array<uintptr_t, 2> wipeLocalVars = { 0x489A70, 0x4899F0 };
 			HookEach_SCMFixes(wipeLocalVars, InterceptCall);
 		}
@@ -4487,7 +4576,7 @@ BOOL InjectDelayedPatches_10()
 				DebugMenuAddVar( "SilentPatch", "Small Steam texts", &bSmallSteamTexts, []() {
 					ToggleSteamTexts( bSmallSteamTexts );
 				} );
-			
+
 			}
 
 			if ( GetPrivateProfileIntW(L"SilentPatch", L"SmallSteamTexts", -1, wcModulePath) == 1 )
@@ -4652,13 +4741,13 @@ BOOL InjectDelayedPatches_10()
 			Patch( 0x58D88A, { 0x90, 0xFF, 0x74, 0x24, 0x20 + 0x10 } );
 			ReadCall( 0x58D8FD, orgRenderOneXLUSprite );
 			InjectHook( 0x58D8FD, &RenderXLUSprite_FloatAlpha );
-		
+
 			// Re-enable
 			if ( INIoption != 0 )
 			{
 				Patch<int32_t>( 0x588905 + 1, 0 );
 			}
-		
+
 			if ( bHasDebugMenu )
 			{
 				static bool bMinimalHUDEnabled = INIoption != 0;
@@ -4805,7 +4894,7 @@ BOOL InjectDelayedPatches_10()
 				static const char * const str[] = { "Default", "Metric", "Imperial" };
 				DebugMenuEntry *e = DebugMenuAddVar( "SilentPatch", "Forced units", &forcedUnits, nullptr, 1, -1, 1, str );
 				DebugMenuEntrySetWrap(e, true);
-			}			
+			}
 		}
 
 		// Register CBaseModelInfo::GetModelInfo for SVF so we can resolve model names
@@ -5161,7 +5250,7 @@ BOOL InjectDelayedPatches_11()
 		// to work fine with Deji's Custom Plate Format
 		// Albeit 1.01 obfuscates this function
 		CCustomCarPlateMgr::GeneratePlateText = (decltype(CCustomCarPlateMgr::GeneratePlateText))0x6FDDE0;
-		
+
 		FLAUtils::Init( moduleList );
 
 		return FALSE;
@@ -5360,7 +5449,7 @@ BOOL InjectDelayedPatches_Steam()
 		// Read CCustomCarPlateMgr::GeneratePlateText from here
 		// to work fine with Deji's Custom Plate Format
 		ReadCall( 0x4D3DA4, CCustomCarPlateMgr::GeneratePlateText );
-		
+
 		FLAUtils::Init( moduleList );
 
 		return FALSE;
@@ -5641,7 +5730,7 @@ void Patch_SA_10(HINSTANCE hInstance)
 	// Proper alpha handling for plane propellers
 	{
 		using namespace BlurredRotorsAtomicRender;
-	
+
 		RenderVehicleHiDetailAlphaCB_BigVehicle = *(decltype(RenderVehicleHiDetailAlphaCB_BigVehicle)*)(0x4C797A + 1);
 
 		orgSetAtomicRendererCB_BigVehicle = *(decltype(orgSetAtomicRendererCB_BigVehicle)*)(0x4C7B76 + 1);
@@ -5706,14 +5795,14 @@ void Patch_SA_10(HINSTANCE hInstance)
 
 	// Lightbeam fix
 	// We need to check for presence of old lightbeam fix - first validate everything old SP did
-	if (	MemEquals( 0x6A2E95, { 0xFF, 0x52, 0x20 } ) && 
+	if (	MemEquals( 0x6A2E95, { 0xFF, 0x52, 0x20 } ) &&
 			MemEquals( 0x6E0F63, { 0xA1 } ) &&
 			MemEquals( 0x6E0F7C, { 0x8B, 0x15 } ) &&
 			MemEquals( 0x6E0F95, { 0x8B, 0x0D } ) &&
 			MemEquals( 0x6E0FAF, { 0xA1 } ) &&
 			MemEquals( 0x6E13D5, { 0xA1 } ) &&
 			MemEquals( 0x6E13ED, { 0x8B, 0x15 } ) &&
-			MemEquals( 0x6E141F, { 0xA1 } )	
+			MemEquals( 0x6E141F, { 0xA1 } )
 		)
 	{
 		using namespace LightbeamFix;
@@ -5816,7 +5905,7 @@ void Patch_SA_10(HINSTANCE hInstance)
 	// Only 1.0 and 1.01, Steam somehow fixed it (not the same way though)
 	Nop(0x58E210, 3);
 	Nop(0x58EAB7, 3);
-	Nop(0x58EAE1, 3);	
+	Nop(0x58EAE1, 3);
 
 	// Zones fix
 	// Only 1.0 and Steam
@@ -5964,7 +6053,7 @@ void Patch_SA_10(HINSTANCE hInstance)
 		Nop(0x57A0FC, 1);
 		InjectHook(0x57A0FD, MSAAText, HookType::Call);
 	}
-	
+
 	// Fixed car collisions - car you're hitting gets proper damage now
 	InjectHook(0x5428EA, FixedCarDamage, HookType::Call);
 
@@ -6010,7 +6099,7 @@ void Patch_SA_10(HINSTANCE hInstance)
 	// "Streaming memory bug" fix
 	InjectHook(0x4C51A9, GTARtAnimInterpolatorSetCurrentAnim);
 
-	
+
 	// Fixed ammo for melee weapons in cheats
 	Patch<BYTE>(0x43890B+1, 1); // knife
 	Patch<BYTE>(0x4389F8+1, 1); // knife
@@ -6196,7 +6285,7 @@ void Patch_SA_10(HINSTANCE hInstance)
 		InjectHook( 0x53A9B7, &CFireManager::StartFire_NullEntityCheck );
 	}
 
-	
+
 	// Decreased keyboard input latency
 	{
 		using namespace KeyboardInputFix;
@@ -6230,7 +6319,7 @@ void Patch_SA_10(HINSTANCE hInstance)
 	// Firela animations
 	{
 		using namespace FirelaHook;
-	
+
 		UpdateMovingCollisionJmp = 0x6B200F;
 		HydraulicControlJmpBack = 0x6B1FBF + 10;
 		InjectHook( 0x6B1FBF, TestFirelaAndFlags, HookType::Jump );
@@ -6495,7 +6584,7 @@ void Patch_SA_10(HINSTANCE hInstance)
 	// Only allow impounding cars and bikes (and their subclasses), as impounding helicopters, planes, boats makes no sense
 	{
 		using namespace RestrictImpoundVehicleTypes;
-	
+
 		std::array<uint32_t, 2> isThisVehicleInteresting = { 0x566794, 0x56A378 };
 		HookEach_ShouldImpound(isThisVehicleInteresting, InterceptCall);
 	}
@@ -6550,7 +6639,7 @@ void Patch_SA_10(HINSTANCE hInstance)
 
 		ProcessControlInput_DontHover = (void*)0x67ED33;
 		ProcessControlInput_Hover = (void*)0x67EDAF;
-	
+
 		Nop(0x67ED2D, 1);
 		InjectHook(0x67ED2D + 1, &ProcessControlInput_HoverWithKeyboard, HookType::Jump);
 		ReadCall(0x67EDA6, orgGetLookBehindForCar);
@@ -6561,7 +6650,7 @@ void Patch_SA_10(HINSTANCE hInstance)
 	// Fixes recruited homies panicking during Los Desperados and other riot-time missions
 	{
 		using namespace RiotDontTargetPlayerGroupDuringMissions;
-	
+
 		DontSkipTargetting = (void*)0x6CD54C;
 		SkipTargetting = (void*)0x6CD7F4;
 		InjectHook(0x6CD545, CheckIfInPlayerGroupAndOnAMission, HookType::Jump);
@@ -6636,7 +6725,7 @@ void Patch_SA_10(HINSTANCE hInstance)
 
 
 	// Invert a CPed::IsAlive check in CTaskComplexEnterCar::CreateNextSubTask to avoid assigning
-	// CTaskComplexLeaveCarAndDie to alive drivers 
+	// CTaskComplexLeaveCarAndDie to alive drivers
 	// Fixes a bug where stealing the car from the passenger side while holding throttle and/or brake would kill the driver,
 	// or briefly resurrect them if they were already dead
 	Patch<uint8_t>(0x63F576, 0x75);
@@ -6770,13 +6859,38 @@ void Patch_SA_10(HINSTANCE hInstance)
 	Patch(0x64FFAD, { 0xD8, 0x64, 0x24 }); // fsub
 
 
-#if FULL_PRECISION_D3D
-	// Test - full precision D3D device
-	Patch<uint8_t>( 0x7F672B+1, *(uint8_t*)(0x7F672B+1) | D3DCREATE_FPU_PRESERVE );
-	Patch<uint8_t>( 0x7F6751+1, *(uint8_t*)(0x7F6751+1) | D3DCREATE_FPU_PRESERVE );
-	Patch<uint8_t>( 0x7F6755+1, *(uint8_t*)(0x7F6755+1) | D3DCREATE_FPU_PRESERVE );
-	Patch<uint8_t>( 0x7F6759+1, *(uint8_t*)(0x7F6759+1) | D3DCREATE_FPU_PRESERVE );
-#endif
+	// Fixed most line wraps not scaling to resolution
+	// Shared namespace, but separate patch applications per-function
+	{
+		using namespace FixedLineWraps;
+
+		// CMenuManager::PrintMap
+		{
+			std::array<uintptr_t, 1> full_width = { 0x575E72 };
+			std::array<uintptr_t, 2> right_align = { 0x5760BA, 0x5762C5 };
+			std::array<uintptr_t, 2> left_align = { 0x5760C4, 0x5762CF };
+
+			MenuManager::HookEach_PrintMap_FullWidth(full_width, InterceptCall);
+			MenuManager::HookEach_PrintMap_Right(right_align, InterceptCall);
+			MenuManager::HookEach_PrintMap_Left(left_align, InterceptCall);
+		}
+
+		// CMenuManager::DrawStandardMenus
+		{
+			std::array<uintptr_t, 3> right_align = { 0x5794E6, 0x5796CE, 0x579894 };
+			std::array<uintptr_t, 2> left_align = { 0x5794F0, 0x57989E };
+
+			MenuManager::HookEach_DrawStandardMenus_Right(right_align, InterceptCall);
+			MenuManager::HookEach_DrawStandardMenus_Left(left_align, InterceptCall);
+		}
+
+		// CReplay::Display
+		{
+			std::array<uintptr_t, 1> set_centre_size = { 0x45C28F };
+
+			Replay::HookEach_Display_Right(set_centre_size, InterceptCall);
+		}
+	}
 }
 
 void Patch_SA_11()
@@ -8017,7 +8131,7 @@ void Patch_SA_NewBinaries_Common(HINSTANCE hInstance)
 		static const float f43 = 4.0f/3.0f, f54 = 5.0f/4.0f, f169 = 16.0f/9.0f;
 		Patch<const void*>(calculateAr.get<void>( 2 + 2 ), &f169);
 		Patch<const void*>(calculateAr.get<void>( 0x1E + 2 ), &f54);
-		Patch<const void*>(calculateAr.get<void>( 0x31 + 2 ), &f43);	
+		Patch<const void*>(calculateAr.get<void>( 0x31 + 2 ), &f43);
 	}
 	TXN_CATCH();
 
@@ -8770,7 +8884,7 @@ void Patch_SA_NewBinaries_Common(HINSTANCE hInstance)
 
 
 	// Invert a CPed::IsAlive check in CTaskComplexEnterCar::CreateNextSubTask to avoid assigning
-	// CTaskComplexLeaveCarAndDie to alive drivers 
+	// CTaskComplexLeaveCarAndDie to alive drivers
 	// Fixes a bug where stealing the car from the passenger side while holding throttle and/or brake would kill the driver,
 	// or briefly resurrect them if they were already dead
 	try
@@ -8798,7 +8912,7 @@ void Patch_SA_NewBinaries_Common(HINSTANCE hInstance)
 			}
 		}();
 		auto setFocus = get_pattern("53 FF 15 ? ? ? ? 5F", 1 + 2);
-			
+
 		auto rRwEngineGetSubSystemInfo = get_pattern("E8 ? ? ? ? 46 83 C4 08 83 C7 50");
 		auto rwEngineGetCurrentSubSystem = get_pattern("7C EA E8 ? ? ? ? A3", 2);
 		MenuManagerAdapterOffset = 0xD8;
@@ -8837,7 +8951,7 @@ void Patch_SA_NewBinaries_Common(HINSTANCE hInstance)
 	}
 	TXN_CATCH();
 
-	
+
 	// Fix post effects not scaling correctly
 	// Heat haze not rescaling after changing resolution
 	// Water ripple effect having too high wave frequency at higher resolutions
@@ -8989,6 +9103,70 @@ void Patch_SA_NewBinaries_Common(HINSTANCE hInstance)
 		Patch(getLocalPositionToOpenCarDoor, { 0xD8, 0x65 }); // fsub
 	}
 	TXN_CATCH();
+
+
+	// Fixed most line wraps not scaling to resolution
+	// Shared namespace, but separate patch applications per-function
+	{
+		using namespace FixedLineWraps;
+
+		// CMenuManager::PrintMap
+		try
+		{
+			auto print_map1 = pattern("E8 ? ? ? ? D9 05 ? ? ? ? D9 1C 24 E8 ? ? ? ? 6A 01").get_one();
+			auto print_map2 = pattern("E8 ? ? ? ? D9 05 ? ? ? ? D9 1C 24 E8 ? ? ? ? 83 C4 04 80 7E 78 00").get_one();
+
+			std::array<void*, 1> full_width = {
+				get_pattern("D9 1C 24 E8 ? ? ? ? 83 C4 04 68 FF 00 00 00 6A 00 6A 00 6A 00 8D 4D C4", 3)
+			};
+			std::array<void*, 2> right_align = {
+				print_map1.get<void>(),
+				print_map2.get<void>(),
+			};
+			std::array<void*, 2> left_align = {
+				print_map1.get<void>(0xE),
+				print_map2.get<void>(0xE),
+			};
+
+			MenuManager::HookEach_PrintMap_FullWidth(full_width, InterceptCall);
+			MenuManager::HookEach_PrintMap_Right(right_align, InterceptCall);
+			MenuManager::HookEach_PrintMap_Left(left_align, InterceptCall);
+		}
+		TXN_CATCH();
+
+		// CMenuManager::DrawStandardMenus
+		try
+		{
+			auto draw_standard_menus1 = pattern("E8 ? ? ? ? D9 05 ? ? ? ? D9 1C 24 E8 ? ? ? ? DB 05").get_one();
+			auto draw_standard_menus2 = pattern("E8 ? ? ? ? D9 05 ? ? ? ? D9 1C 24 E8 ? ? ? ? 83 C4 04 80 BE").get_one();
+
+			std::array<void*, 3> right_align = {
+				draw_standard_menus1.get<void>(),
+				get_pattern("E8 ? ? ? ? 6A 01 E8 ? ? ? ? 83 C4 08 39 3D"),
+				draw_standard_menus2.get<void>(),
+
+			};
+			std::array<void*, 2> left_align = {
+				draw_standard_menus1.get<void>(0xE),
+				draw_standard_menus2.get<void>(0xE),
+			};
+
+			MenuManager::HookEach_DrawStandardMenus_Right(right_align, InterceptCall);
+			MenuManager::HookEach_DrawStandardMenus_Left(left_align, InterceptCall);
+		}
+		TXN_CATCH();
+
+		// CReplay::Display
+		try
+		{
+			std::array<void*, 1> set_centre_size = {
+				get_pattern("83 C4 10 D9 1C 24 E8 ? ? ? ? 6A 01 E8 ? ? ? ? 83 C4 08", 6)
+			};
+
+			Replay::HookEach_Display_Right(set_centre_size, InterceptCall);
+		}
+		TXN_CATCH();
+	}
 }
 
 
@@ -9010,9 +9188,9 @@ BOOL WINAPI DllMain(HINSTANCE hinstDLL, DWORD fdwReason, LPVOID lpvReserved)
 		{
 			// TODO:
 			// Add r1 low violence check to MemoryMgr.GTA via
-			// if ( *(DWORD*)DynBaseAddress(0x49F810) == 0x64EC8B55 ) { normal } else { low violence } 
+			// if ( *(DWORD*)DynBaseAddress(0x49F810) == 0x64EC8B55 ) { normal } else { low violence }
 			Patch_SA_NewBinaries_Common(hInstance);
-		}	
+		}
 	}
 	return TRUE;
 }

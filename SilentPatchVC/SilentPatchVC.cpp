@@ -225,6 +225,54 @@ namespace UIScales
 			return Height_Internal_Scale(Mult);
 		}
 	};
+
+	// CReplay
+	struct Replay
+	{
+		static float Width()
+		{
+			static float** Mult = Width_Internal("83 E0 20 0F 84 ? ? ? ? DB 05 ? ? ? ? 50 D8 0D ? ? ? ? D8 0D ? ? ? ? D9 1C 24 DB 05 ? ? ? ? 50 D8 0D", 0x26 + 2);
+			return Width_Internal_Scale(Mult);
+		}
+
+		static float Height()
+		{
+			static float** Mult = Height_Internal("83 E0 20 0F 84 ? ? ? ? DB 05 ? ? ? ? 50 D8 0D ? ? ? ? D8 0D ? ? ? ? D9 1C 24 DB 05 ? ? ? ? 50 D8 0D", 0x10 + 2);
+			return Height_Internal_Scale(Mult);
+		}
+	};
+
+	// CGarages
+	struct Garages
+	{
+		static float Width()
+		{
+			static float** Mult = Width_Internal("39 C2 0F 83 ? ? ? ? E8 ? ? ? ? DB 05 ? ? ? ? 50 D8 0D ? ? ? ? D8 0D ? ? ? ? D9 1C 24 DB 05 ? ? ? ? 50 D8 0D", 0x2A + 2);
+			return Width_Internal_Scale(Mult);
+		}
+
+		static float Height()
+		{
+			static float** Mult = Height_Internal("39 C2 0F 83 ? ? ? ? E8 ? ? ? ? DB 05 ? ? ? ? 50 D8 0D ? ? ? ? D8 0D ? ? ? ? D9 1C 24 DB 05 ? ? ? ? 50 D8 0D", 0x14 + 2);
+			return Height_Internal_Scale(Mult);
+		}
+	};
+
+	// CSpecialFX
+	struct SpecialFX
+	{
+		static float Width()
+		{
+			static float** Mult = Width_Internal("80 3D ? ? ? ? ? 0F 84 ? ? ? ? DB 05 ? ? ? ? 50 D8 0D ? ? ? ? D8 0D ? ? ? ? D9 1C 24 DB 05 ? ? ? ? 50 D8 0D", 0x2A + 2);
+			return Width_Internal_Scale(Mult);
+		}
+
+		static float Height()
+		{
+			static float** Mult = Height_Internal("80 3D ? ? ? ? ? 0F 84 ? ? ? ? DB 05 ? ? ? ? 50 D8 0D ? ? ? ? D8 0D ? ? ? ? D9 1C 24 DB 05 ? ? ? ? 50 D8 0D", 0x14 + 2);
+			return Height_Internal_Scale(Mult);
+		}
+	};
 }
 
 static bool bGameInFocus = true;
@@ -400,7 +448,7 @@ namespace RadardiscFixes
 
 	template<std::size_t Index>
 	static void (__fastcall* orgDrawSprite)(void* obj, void*, const CRect& rect, const CRGBA& col1, const CRGBA& col2, const CRGBA& col3, const CRGBA& col4);
-	
+
 	template<std::size_t Index>
 	static void __fastcall DrawSprite_Scale(void* obj, void*, const CRect& rect, const CRGBA& col1, const CRGBA& col2, const CRGBA& col3, const CRGBA& col4)
 	{
@@ -540,7 +588,7 @@ namespace LoadingBarOutlineFixes
 	}
 
 	static CRGBA* (__fastcall* orgRGBACtor)(CRGBA* obj, void*, unsigned char r, unsigned char g, unsigned char b, unsigned char a);
-	
+
 	template<std::size_t NumXPos, std::size_t NumYPos>
 	static CRGBA* __fastcall RGBACtor_RecalculatePositions(CRGBA* obj, void*, unsigned char r, unsigned char g, unsigned char b, unsigned char a)
 	{
@@ -870,6 +918,69 @@ namespace LegendBlipFix
 		const float x3 = x1 + (x1 - x4);
 		orgDraw2DPolygon(x1, y1, x2, y2, x3, y3, x4, y4, color);
 	}
+}
+
+
+// ============= Fixed most line wraps not scaling to resolution =============
+namespace FixedLineWraps
+{
+	// Can be SetWrapx, SetRightJustifyWrap, or SetCentreSize
+	template<typename Scaler>
+	struct WrapInternal
+	{
+		template<std::size_t Index>
+		static void (*orgWrapFunction)(float);
+
+		template<std::size_t Index>
+		static void WrapFunction_LeftAlign(float fLength)
+		{
+			orgWrapFunction<Index>(fLength * Scaler::Width());
+		}
+
+		template<std::size_t Index>
+		static void WrapFunction_RightAlign(float fLength)
+		{
+			const int origin = RsGlobal->MaximumWidth;
+
+			fLength -= origin;
+			fLength *= Scaler::Width();
+			fLength += origin;
+
+			orgWrapFunction<Index>(fLength);
+		}
+
+		template<std::size_t Index>
+		static void WrapFunction_FullWidth(float /*fLength*/)
+		{
+			orgWrapFunction<Index>(static_cast<float>(RsGlobal->MaximumWidth));
+		}
+	};
+
+	struct MenuManager : public WrapInternal<UIScales::MenuManager>
+	{
+		HOOK_EACH_INIT_CTR(Draw_Left, 0, orgWrapFunction, WrapFunction_LeftAlign);
+		HOOK_EACH_INIT_CTR(Draw_Right, 1, orgWrapFunction, WrapFunction_RightAlign);
+	};
+
+	struct Darkel : public WrapInternal<UIScales::Darkel>
+	{
+		HOOK_EACH_INIT_CTR(DrawMessages_Right, 0, orgWrapFunction, WrapFunction_RightAlign);
+	};
+
+	struct Garages : public WrapInternal<UIScales::Garages>
+	{
+		HOOK_EACH_INIT_CTR(PrintMessages_Right, 0, orgWrapFunction, WrapFunction_RightAlign);
+	};
+
+	struct Replay : public WrapInternal<UIScales::Replay>
+	{
+		HOOK_EACH_INIT_CTR(Display_Right, 0, orgWrapFunction, WrapFunction_RightAlign);
+	};
+
+	struct SpecialFX : public WrapInternal<UIScales::SpecialFX>
+	{
+		HOOK_EACH_INIT_CTR(Render2DFXs_Right, 0, orgWrapFunction, WrapFunction_RightAlign);
+	};
 }
 
 
@@ -1552,7 +1663,7 @@ namespace OutroSplashFix
 
 	static RGBA* (__thiscall *orgRGBASet)(RGBA*, uint8_t, uint8_t, uint8_t, uint8_t);
 	static RGBA* __fastcall RGBASet_Clamp(RGBA* rgba, void*, int r, int g, int b, int a)
-	{	
+	{
 		return orgRGBASet(rgba, static_cast<uint8_t>(r), static_cast<uint8_t>(g), static_cast<uint8_t>(b), static_cast<uint8_t>(std::clamp(a, 0, 255)));
 	}
 }
@@ -1649,7 +1760,7 @@ void InjectDelayedPatches_VC_Common( bool bHasDebugMenu, const wchar_t* wcModule
 		}
 	}
 
-	
+
 	// Corrected siren corona placement for emergency vehicles
 	if ( GetPrivateProfileIntW(L"SilentPatch", L"EnableVehicleCoronaFixes", -1, wcModulePath) == 1 )
 	{
@@ -1722,7 +1833,7 @@ void InjectDelayedPatches_VC_Common( bool bHasDebugMenu, const wchar_t* wcModule
 
 			Patch( enforcer2.get<float*>( 7 + 2 ), &ENFORCER_SIREN_POS.z );
 			Patch( enforcer2.get<float*>( 7 + 2 + (6*1) ), &ENFORCER_SIREN_POS.y );
-			Patch( enforcer2.get<float*>( 7 + 2 + (6*2) ), &ENFORCER_SIREN_MINUS_X );	
+			Patch( enforcer2.get<float*>( 7 + 2 + (6*2) ), &ENFORCER_SIREN_MINUS_X );
 		}
 		TXN_CATCH();
 
@@ -1803,7 +1914,7 @@ void InjectDelayedPatches_VC_Common( bool bHasDebugMenu, const wchar_t* wcModule
 			get_pattern("DD D8 E8 ? ? ? ? 56", 2),
 			get_pattern("E8 ? ? ? ? FF 44 24 0C 83 C5 0C"),
 		};
-		
+
 		HookEach_ReplaceWithNewModel(replaceWithNewModel, InterceptCall);
 	}
 	TXN_CATCH();
@@ -1903,7 +2014,7 @@ void InjectDelayedPatches_VC_Common( bool bHasDebugMenu, const wchar_t* wcModule
 	}
 	TXN_CATCH();
 
-	
+
 	// Fix the onscreen counter bar placement and shadow not scaling to resolution
 	try
 	{
@@ -2086,7 +2197,7 @@ void InjectDelayedPatches_VC_Common( bool bHasDebugMenu, const wchar_t* wcModule
 		static const std::array<uint32_t*, 4> hudReinitialiseVariables = {
 			reinitialise1.get(0).get<uint32_t>(6),
 			reinitialise1.get(1).get<uint32_t>(6),
-			
+
 			reinitialise2.get(0).get<uint32_t>(6),
 			reinitialise2.get(1).get<uint32_t>(6),
 		};
@@ -2371,7 +2482,7 @@ void Patch_VC_10(uint32_t width, uint32_t height)
 	Patch<BYTE>(0x550603, 255);
 	Patch<BYTE>(0x550607, 255);
 
-	
+
 	// Corrected crime codes
 	Patch<DWORD>(0x5FDDDB, 0xC5);
 
@@ -2835,7 +2946,7 @@ void Patch_VC_Common()
 	}
 	TXN_CATCH();
 
-	
+
 	// Make drive-by one shot sounds owned by the driver instead of the car
 	// Fixes incorrect weapon sound being used for drive-by
 	try
@@ -3054,7 +3165,7 @@ void Patch_VC_Common()
 		auto entity_render = pattern("56 75 06 5E 5B C3").get_one();
 
 		EntityRender_Prologue_JumpBack = entity_render.get<void>();
-		
+
 		// Check if CEntity::Render is already re-routed by something else
 		if (*entity_render.get<uint8_t>(-7) == 0xE9)
 		{
@@ -3158,6 +3269,94 @@ void Patch_VC_Common()
 		InterceptCall(draw2dPolygon, orgDraw2DPolygon, Draw2DPolygon_FixVertices);
 	}
 	TXN_CATCH();
+
+
+	// Fixed most line wraps not scaling to resolution
+	// Shared namespace, but separate patch applications per-function
+	{
+		using namespace FixedLineWraps;
+
+		// CMenuManager (general)
+		try
+		{
+			auto menu_manager_draw1 = pattern("50 DB 44 24 ? D9 1C ? E8 ? ? ? ? 59 FF 35 ? ? ? ? E8").count(4);
+			auto menu_manager_draw2 = pattern("50 DB 84 24 ? ? ? ? D9 1C 24 E8 ? ? ? ? 59 FF 35 ? ? ? ? E8").count(3);
+
+			std::array<void*, 7> right_align = {
+				menu_manager_draw1.get(0).get<void>(8),
+				menu_manager_draw1.get(1).get<void>(8),
+				menu_manager_draw1.get(2).get<void>(8),
+				menu_manager_draw1.get(3).get<void>(8),
+
+				menu_manager_draw2.get(0).get<void>(0xB),
+				menu_manager_draw2.get(1).get<void>(0xB),
+				menu_manager_draw2.get(2).get<void>(0xB),
+			};
+
+			std::array<void*, 7> left_align = {
+				menu_manager_draw1.get(0).get<void>(0x14),
+				menu_manager_draw1.get(1).get<void>(0x14),
+				menu_manager_draw1.get(2).get<void>(0x14),
+				menu_manager_draw1.get(3).get<void>(0x14),
+
+				menu_manager_draw2.get(0).get<void>(0x17),
+				menu_manager_draw2.get(1).get<void>(0x17),
+				menu_manager_draw2.get(2).get<void>(0x17),
+			};
+
+			MenuManager::HookEach_Draw_Right(right_align, InterceptCall);
+			MenuManager::HookEach_Draw_Left(left_align, InterceptCall);
+		}
+		TXN_CATCH();
+
+		// CDarkel::DrawMessages
+		try
+		{
+			std::array<void*, 2> set_centre_size = {
+				get_pattern("E8 ? ? ? ? 59 E8 ? ? ? ? E8 ? ? ? ? A1"),
+				get_pattern("D9 1C 24 E8 ? ? ? ? 59 E8 ? ? ? ? B9", 3)
+			};
+
+			Darkel::HookEach_DrawMessages_Right(set_centre_size, InterceptCall);
+		}
+		TXN_CATCH();
+
+		// CGarages::PrintMessages
+		try
+		{
+			std::array<void*, 1> set_centre_size = {
+				get_pattern("E8 ? ? ? ? 59 E8 ? ? ? ? 6A 01 E8 ? ? ? ? 59 8D 4C 24 08")
+			};
+
+			Garages::HookEach_PrintMessages_Right(set_centre_size, InterceptCall);
+		}
+		TXN_CATCH();
+
+		// CReplay::Display
+		try
+		{
+			std::array<void*, 1> set_centre_size = {
+				get_pattern("D9 1C 24 E8 ? ? ? ? 59 59 E8 ? ? ? ? E8 ? ? ? ? A1 ? ? ? ? 83 C0 EC 89 04 24 50 DB 44 24 04 D9 1C 24 E8", 0x27)
+			};
+
+			Replay::HookEach_Display_Right(set_centre_size, InterceptCall);
+		}
+		TXN_CATCH();
+
+		// CSpecialFX::Render2DFXs
+		try
+		{
+			auto set_centre_size_pattern = pattern("DB 44 24 0C D9 1C 24 E8 ? ? ? ? 59").count(2);
+
+			std::array<void*, 2> set_centre_size = {
+				set_centre_size_pattern.get(0).get<void>(7),
+				set_centre_size_pattern.get(1).get<void>(7),
+			};
+
+			SpecialFX::HookEach_Render2DFXs_Right(set_centre_size, InterceptCall);
+		}
+		TXN_CATCH();
+	}
 }
 
 BOOL WINAPI DllMain(HINSTANCE hinstDLL, DWORD fdwReason, LPVOID lpvReserved)
