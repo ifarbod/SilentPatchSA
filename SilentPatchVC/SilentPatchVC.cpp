@@ -587,15 +587,15 @@ namespace LoadingBarOutlineFixes
 		((YPos_Recalculated<I> = *orgYPos<I> * multiplier), ...);
 	}
 
-	static CRGBA* (__fastcall* orgRGBACtor)(CRGBA* obj, void*, unsigned char r, unsigned char g, unsigned char b, unsigned char a);
+	static void* (__thiscall* orgRGBACtor)(void* obj, void* r, void* g, void* b, void* a);
 
 	template<std::size_t NumXPos, std::size_t NumYPos>
-	static CRGBA* __fastcall RGBACtor_RecalculatePositions(CRGBA* obj, void*, unsigned char r, unsigned char g, unsigned char b, unsigned char a)
+	static void* __fastcall RGBACtor_RecalculatePositions(void* obj, void*, void* r, void* g, void* b, void* a)
 	{
 		RecalculateXPositions(std::make_index_sequence<NumXPos>{});
 		RecalculateYPositions(std::make_index_sequence<NumYPos>{});
 
-		return orgRGBACtor(obj, nullptr, r, g, b, a);
+		return orgRGBACtor(obj, r, g, b, a);
 	}
 
 
@@ -981,6 +981,51 @@ namespace FixedLineWraps
 	{
 		HOOK_EACH_INIT_CTR(Render2DFXs_Right, 0, orgWrapFunction, WrapFunction_RightAlign);
 	};
+}
+
+
+// ============= Fix "You are here" shadow not scaling to resolution =============
+namespace YouAreHereScalingFixes
+{
+	template<std::size_t Index>
+	static const float* orgXPos;
+
+	template<std::size_t Index>
+	static float XPos_Recalculated;
+
+	template<std::size_t Index>
+	static const float* orgYPos;
+
+	template<std::size_t Index>
+	static float YPos_Recalculated;
+
+	template<std::size_t... I>
+	static void RecalculateXPositions(std::index_sequence<I...>)
+	{
+		const float multiplier = UIScales::MenuManager::Width();
+		((XPos_Recalculated<I> = *orgXPos<I> * multiplier), ...);
+	}
+
+	template<std::size_t... I>
+	static void RecalculateYPositions(std::index_sequence<I...>)
+	{
+		const float multiplier = UIScales::MenuManager::Height();
+		((YPos_Recalculated<I> = *orgYPos<I> * multiplier), ...);
+	}
+
+	static void* (__thiscall* orgRGBACtor)(void* obj, void* r, void* g, void* b, void* a);
+
+	template<std::size_t NumXPos, std::size_t NumYPos>
+	static void* __fastcall RGBACtor_RecalculatePositions(void* obj, void*, void* r, void* g, void* b, void* a)
+	{
+		RecalculateXPositions(std::make_index_sequence<NumXPos>{});
+		RecalculateYPositions(std::make_index_sequence<NumYPos>{});
+
+		return orgRGBACtor(obj, r, g, b, a);
+	}
+
+	HOOK_EACH_INIT(XPos, orgXPos, XPos_Recalculated);
+	HOOK_EACH_INIT(YPos, orgYPos, YPos_Recalculated);
 }
 
 
@@ -2396,6 +2441,32 @@ void InjectDelayedPatches_VC_Common( bool bHasDebugMenu, const wchar_t* wcModule
 
 		HookEach_MessageYOffset(YOffset, InterceptMemDisplacement);
 		InterceptCall(setDropColor, orgSetDropColor, SetDropColor_Scale<YOffset.size()>);
+	}
+	TXN_CATCH();
+
+
+	// Fix "You are here" shadow not scaling to resolution
+	try
+	{
+		using namespace YouAreHereScalingFixes;
+
+		auto rgbaCtor = get_pattern("E8 ? ? ? ? 89 F0 89 74 24 18");
+
+		std::array<float**, 3> XPositions = {
+			get_pattern<float*>("D9 05 ? ? ? ? D8 44 24 0C D9 5C 24 24", 2),
+			get_pattern<float*>("D9 05 ? ? ? ? D8 44 24 18 D9 5C 24 30", 2),
+
+			get_pattern<float*>("D9 05 ? ? ? ? D8 44 24 10 50", 2), // WrapX
+		};
+
+		std::array<float**, 2> YPositions = {
+			get_pattern<float*>("D9 05 ? ? ? ? D8 44 24 10 D9 5C 24 30", 2),
+			get_pattern<float*>("D9 05 ? ? ? ? D8 44 24 1C D9 5C 24 2C", 2),
+		};
+
+		HookEach_XPos(XPositions, InterceptMemDisplacement);
+		HookEach_YPos(YPositions, InterceptMemDisplacement);
+		InterceptCall(rgbaCtor, orgRGBACtor, RGBACtor_RecalculatePositions<XPositions.size(), YPositions.size()>);
 	}
 	TXN_CATCH();
 
