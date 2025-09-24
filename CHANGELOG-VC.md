@@ -41,7 +41,6 @@ All the remaining, non-critical fixes.
 * Some props in Malibu Club, Ocean View Hotel, and Pole Position Club have been restored; more environment shows outside when the player is in the interior too (just like on PS2).
 * All text shadows, onscreen counter bar shadows, and the loading screen outline now scale to resolution correctly.
 * The trace (Destination) blip outlines are now scaling to the resolution properly.
-* The radar's horizontal position, the disc texture, and the shadow now scale to resolution correctly. The radar disc was also shrunk slightly to fix gaps and make the icons sit better on the edge.
 * Credits now scale to resolution correctly.
 * Mission title and 'Mission Passed' texts now stay on screen for the same duration, regardless of screen resolution.
 * The inner padding of the text boxes with a background now scales to resolution correctly.
@@ -73,6 +72,7 @@ All the remaining, non-critical fixes.
 * ⚙️ Fixed taxi light corona placement for Taxi.
 * ⚙️ Fixed police chopper's searchlight and red tail light placement.
 * ⚙️ Fixed numerous model glitches by disabling backface culling on detached vehicle parts, ped models, and a subset of map models specified in the INI file.
+* ⚙️ The radar's horizontal position, disc texture, and shadow now scale to resolution correctly. The radar disc was also shrunk slightly to fix gaps and make the icons sit better on the edge (can be disabled for incompatible mods).
 
 ## Enhancements
 Any changes that don't strictly fix game bugs.

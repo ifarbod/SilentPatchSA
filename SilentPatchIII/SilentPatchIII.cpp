@@ -3083,6 +3083,19 @@ void Patch_III_Common()
 		}
 		TXN_CATCH();
 	}
+
+
+	// Fixed weapon icons being off by a pixel in the top left corner
+	try
+	{
+		auto draw_sprite = pattern("FF 35 ? ? ? ? FF 35 ? ? ? ? FF 35 ? ? ? ? FF 35 ? ? ? ? FF 35 ? ? ? ? 52 50 E8 ? ? ? ? E8").get_one();
+
+		static const float fFixedUV = 0.0f;
+		Patch(draw_sprite.get<void>(2), &fFixedUV);
+		Patch(draw_sprite.get<void>(18 + 2), &fFixedUV);
+		Patch(draw_sprite.get<void>(24 + 2), &fFixedUV);
+	}
+	TXN_CATCH();
 }
 
 BOOL WINAPI DllMain(HINSTANCE hinstDLL, DWORD fdwReason, LPVOID lpvReserved)
