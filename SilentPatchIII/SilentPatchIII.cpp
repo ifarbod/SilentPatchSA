@@ -7,6 +7,7 @@
 #include "Desktop.h"
 #include "VehicleIII.h"
 #include "ModelInfoIII.h"
+#include "RWUtils.hpp"
 #include "TheFLAUtils.h"
 #include "SVF.h"
 
@@ -1576,6 +1577,20 @@ namespace MenuManagerScalingFixes
 }
 
 
+// ============= Fixed weapon icons being off by a pixel in the top left corner, and not always using linear filtering =============
+namespace WeaponIconRendering
+{
+	static void (__thiscall* orgDrawSprite)(void* obj, void* a1, void* a2, float u1, float v1, void* u2, void* v2, float u3, void* v3, void* u4, void* v4);
+	static void __fastcall DrawSprite_Linear(void* obj, void*, void* a1, void* a2, void* /*u1*/, void* /*v1*/, void* u2, void* v2, void* /*u3*/, void* v3, void* u4, void* v4)
+	{
+		RwScopedRenderState<rwRENDERSTATETEXTUREFILTER> state;
+
+		RwRenderStateSet(rwRENDERSTATETEXTUREFILTER, (void*)rwFILTERLINEAR);
+		orgDrawSprite(obj, a1, a2, 0.0f, 0.0f, u2, v2, 0.0f, v3, u4, v4);
+	}
+}
+
+
 namespace ModelIndicesReadyHook
 {
 	static void (*orgInitialiseObjectData)(const char*);
@@ -3085,15 +3100,14 @@ void Patch_III_Common()
 	}
 
 
-	// Fixed weapon icons being off by a pixel in the top left corner
+	// Fixed weapon icons being off by a pixel in the top left corner, and not always using linear filtering
 	try
 	{
-		auto draw_sprite = pattern("FF 35 ? ? ? ? FF 35 ? ? ? ? FF 35 ? ? ? ? FF 35 ? ? ? ? FF 35 ? ? ? ? 52 50 E8 ? ? ? ? E8").get_one();
+		using namespace WeaponIconRendering;
 
-		static const float fFixedUV = 0.0f;
-		Patch(draw_sprite.get<void>(2), &fFixedUV);
-		Patch(draw_sprite.get<void>(18 + 2), &fFixedUV);
-		Patch(draw_sprite.get<void>(24 + 2), &fFixedUV);
+		auto draw_sprite = get_pattern("50 E8 ? ? ? ? E8 ? ? ? ? DB 05 ? ? ? ? 50 D8 0D ? ? ? ? D8 0D", 1);
+
+		InterceptCall(draw_sprite, orgDrawSprite, DrawSprite_Linear);
 	}
 	TXN_CATCH();
 }
