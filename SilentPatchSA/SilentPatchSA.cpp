@@ -6891,6 +6891,13 @@ void Patch_SA_10(HINSTANCE hInstance)
 			Replay::HookEach_Display_Right(set_centre_size, InterceptCall);
 		}
 	}
+
+
+	// Stop cops holding one handed guns like gangsters, with a tilted stance
+	// Instead, give this behaviour to dealers and criminals
+	// By iFarbod
+	Patch<int8_t>(0x61E52E + 2, 0x11); // PED_TYPE_DEALER
+	Patch<int8_t>(0x61E533 + 2, 0x14); // PED_TYPE_CRIMINAL
 }
 
 void Patch_SA_11()
@@ -9167,6 +9174,18 @@ void Patch_SA_NewBinaries_Common(HINSTANCE hInstance)
 		}
 		TXN_CATCH();
 	}
+
+	// Stop cops holding one handed guns like gangsters, with a tilted stance
+	// Instead, give this behaviour to dealers and criminals
+	// By iFarbod
+	try
+	{
+		auto set_move_anim = pattern("83 F8 0F 7E 05 83 F8 06 75 11").get_one();
+
+		Patch<int8_t>(set_move_anim.get<void>(2), 0x11); // PED_TYPE_DEALER
+		Patch<int8_t>(set_move_anim.get<void>(5 + 2), 0x14); // PED_TYPE_CRIMINAL
+	}
+	TXN_CATCH();
 }
 
 

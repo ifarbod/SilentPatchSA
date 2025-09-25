@@ -39,6 +39,7 @@ SilentPatch includes code contributions from:
 * B1ack_Wh1te
 * DK22Pac
 * Fire_Head
+* iFarbod
 * Nick007J
 * NTAuthority
 * Sergeanur

@@ -108,6 +108,7 @@ All the remaining, non-critical fixes.
 * ➕ Hunter's interior does not disappear when viewed through the glass door panel.
 * ➕ CJ no longer sinks inside the bike when jumping on it from the front (contributed by **B1ack_Wh1te**).
 * ➕ Characters entering the back of van vehicles will no longer sligthly teleport when playing the entering animation (contributed by **B1ack_Wh1te**).
+* ➕ Cops will no longer hold one handed weapons like gangsters. This behaviour is now given to dealers and criminals instead (contributed by **iFarbod**).
 * Detached vehicle parts will now keep the same color and lighting as the vehicle they came from.
 * Detached vehicle parts are now rendered from both sides.
 * Resolved single-pixel wide seams showing on the Map screen with Anti-Aliasing enabled.
