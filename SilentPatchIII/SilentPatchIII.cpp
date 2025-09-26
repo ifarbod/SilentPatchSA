@@ -1591,6 +1591,72 @@ namespace WeaponIconRendering
 }
 
 
+// ============= Fixed one-shot sounds playing at a wrong position if the previous one-shot played with reflection (backport from Vice City, found by Sergeanur) =============
+namespace OneShotSoundReflectionPositionFix
+{
+	class tSound
+	{
+	public:
+		int32_t m_nEntityIndex;
+		int32_t m_nCounter;
+		int32_t m_nSampleIndex;
+		uint8_t m_nBankIndex;
+		bool m_bIs2D;
+		int32_t m_nReleasingVolumeModificator;
+		uint32_t m_nFrequency;
+		uint8_t m_nVolume;
+		float m_fDistance;
+		int32_t m_nLoopCount;
+		int32_t m_nLoopStart;
+		int32_t m_nLoopEnd;
+		uint8_t m_nEmittingVolume;
+		float m_fSpeedMultiplier;
+		float m_fSoundIntensity;
+		bool m_bReleasingSoundFlag;
+		CVector m_vecPos;
+		bool m_bReverbFlag;
+		uint8_t m_nLoopsRemaining;
+		bool m_bRequireReflection;
+		uint8_t m_nOffset;
+		int32_t m_nReleasingVolumeDivider;
+		bool m_bIsProcessed;
+		bool m_bLoopEnded;
+		int32_t m_nCalculatedVolume;
+		int8_t m_nVolumeChange;
+	};
+	static_assert(sizeof(tSound) == 92);
+
+	class cAudioManager
+	{
+	public:
+		bool m_bIsInitialised;
+		bool m_bReverb;
+		bool m_bFifthFrameFlag;
+		uint8_t m_nActiveSamples;
+		uint8_t field_4;
+		bool m_bDynamicAcousticModelingStatus;
+		float m_fSpeedOfSound;
+		bool m_bTimerJustReset;
+		int32_t m_nTimer;
+		tSound m_sQueueSample;
+
+		// No need for the rest
+	};
+
+	static void (__thiscall* orgAddReflectionsToRequestedQueue)(cAudioManager* obj);
+	static void __fastcall AddReflectionsToRequestedQueue_SavePosition(cAudioManager* obj)
+	{
+		const CVector vecPos = obj->m_sQueueSample.m_vecPos;
+		const float fDistance = obj->m_sQueueSample.m_fDistance;
+
+		orgAddReflectionsToRequestedQueue(obj);
+
+		obj->m_sQueueSample.m_vecPos = vecPos;
+		obj->m_sQueueSample.m_fDistance = fDistance;
+	}
+}
+
+
 namespace ModelIndicesReadyHook
 {
 	static void (*orgInitialiseObjectData)(const char*);
@@ -3108,6 +3174,18 @@ void Patch_III_Common()
 		auto draw_sprite = get_pattern("50 E8 ? ? ? ? E8 ? ? ? ? DB 05 ? ? ? ? 50 D8 0D ? ? ? ? D8 0D", 1);
 
 		InterceptCall(draw_sprite, orgDrawSprite, DrawSprite_Linear);
+	}
+	TXN_CATCH();
+
+
+	// Fixed one-shot sounds playing at a wrong position if the previous one-shot played with reflection (backport from Vice City, found by Sergeanur)
+	try
+	{
+		using namespace OneShotSoundReflectionPositionFix;
+
+		auto add_reflections = get_pattern("89 E9 E8 ? ? ? ? 83 C4 08", 2);
+		
+		InterceptCall(add_reflections, orgAddReflectionsToRequestedQueue, AddReflectionsToRequestedQueue_SavePosition);
 	}
 	TXN_CATCH();
 }
