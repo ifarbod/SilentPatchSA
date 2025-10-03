@@ -84,5 +84,6 @@ Any changes that don't strictly fix game bugs.
 
 * If the settings file is absent, the game will now default to your desktop resolution instead of 640x480x16.
 * All censorships from German and French versions of the game have been removed.
+* ⚙️ Subtitles no longer overlap the radar during gameplay and are properly centered in cutscenes.
 * ⚙️ Made the game select metric/imperial units based on system locale settings.
 * ⚙️ Sliding mission titles and odd job texts from the GTA III beta can now be re-enabled (off by default).

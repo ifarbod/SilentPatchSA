@@ -184,6 +184,17 @@ namespace UIScales
 		}
 	};
 
+	// CHud - widescreen fixed, scaled by HUD scale
+	// Currently the same as "Hud", but wsfix may separate it in the future
+	struct HudSubtitles
+	{
+		static float Width()
+		{
+			static float** Mult = Width_Internal("89 54 24 2C D8 0D ? ? ? ? DD DB", 4 + 2);
+			return Width_Internal_Scale(Mult);
+		}
+	};
+
 	// cMusicManager - widescreen fixed, affected by HUD scale
 	struct MusicManager
 	{
@@ -1657,6 +1668,93 @@ namespace OneShotSoundReflectionPositionFix
 }
 
 
+// ============= Fix subtitles attempting to make space for the radar and failing - finish the feature like Vice City did =============
+namespace SubtitleRadarCutoutFix
+{
+	// This feature appears to be unfinished in GTA III, as it makes space only for the radar X position, ignoring its width.
+	// This leaves subtitles laid out in a way that makes no sense either for gameplay (as they obscure the radar) or for cutscenes (as they are not centered).
+	// This fix "completes" the feature similar to how Vice City does it.
+	static bool bEnableFix = true;
+
+	template<std::size_t Index>
+	static const float* orgPaddingSize;
+
+	template<std::size_t Index>
+	static float PaddingSize_Recalculated;
+
+	template<std::size_t Index>
+	static const float* orgRadarXPos;
+
+	template<std::size_t Index>
+	static float RadarXPos_Recalculated;
+
+	static const float* orgRadarWidth;
+	static const float* orgRadarBorderWidth;
+
+	template<std::size_t... I>
+	static void RecalculateValues(std::index_sequence<I...>)
+	{
+		if (bEnableFix && !(*bWideScreenOn))
+		{
+			const float RadarSubtitleRatio = UIScales::Radar::Width() / UIScales::HudSubtitles::Width();
+			const float ExtraRadarOffset = *orgRadarWidth + *orgRadarBorderWidth;
+
+			((PaddingSize_Recalculated<I> = *orgPaddingSize<I> - *orgRadarXPos<I>), ...);
+			((RadarXPos_Recalculated<I> = (*orgRadarXPos<I> + ExtraRadarOffset) * RadarSubtitleRatio), ...);
+		}
+		else
+		{
+			((PaddingSize_Recalculated<I> = *orgPaddingSize<I>), ...);
+			((RadarXPos_Recalculated<I> = *orgRadarXPos<I>), ...);		
+		}
+	}
+
+	static bool* bWideScreenOn;
+	static float fExtraSubtitleYOffset;
+
+	static void (*orgSetCentreSize)(float size);
+	static void SetCentreSize_CenterForCutscene(float size)
+	{
+		if (bEnableFix && *bWideScreenOn)
+		{
+			size = RsGlobal->MaximumWidth - UIScales::HudSubtitles::Width() * *orgPaddingSize<0>;
+		}
+		orgSetCentreSize(size);
+	}
+
+	static void (*orgPrintString)(float X, float Y, void* text);
+	static void PrintString_CenterForCutscene(float X, float Y, void* text)
+	{
+		if (bEnableFix)
+		{
+			if (*bWideScreenOn)
+			{
+				X = RsGlobal->MaximumWidth / 2.0f;
+			}
+			else
+			{
+				Y -= fExtraSubtitleYOffset;
+			}
+		}
+		orgPrintString(X, Y, text);
+	}
+
+	static void (*orgSetScale)(void* scaleX, float scaleY);
+
+	template<std::size_t NumVariables>
+	static void SetScale_RecalculateValues(void* scaleX, float scaleY)
+	{
+		orgSetScale(scaleX, scaleY);
+		fExtraSubtitleYOffset = scaleY * 20.0f;
+
+		RecalculateValues(std::make_index_sequence<NumVariables>());
+	}
+
+	HOOK_EACH_INIT(PaddingSize, orgPaddingSize, PaddingSize_Recalculated);
+	HOOK_EACH_INIT(RadarXPos, orgRadarXPos, RadarXPos_Recalculated);
+}
+
+
 namespace ModelIndicesReadyHook
 {
 	static void (*orgInitialiseObjectData)(const char*);
@@ -1841,57 +1939,116 @@ void InjectDelayedPatches_III_Common( bool bHasDebugMenu, const wchar_t* wcModul
 	TXN_CATCH();
 
 
-	// Fix the radar disc shadow scaling and radar X position
+	// Both these fixes touch the radar, and subtitles must go first, as they need to save the "unscaled" radardisc width
 	try
 	{
-		using namespace RadardiscFixes;
 		// We use this overkill pattern so we can get all those constants safely in one sweep. One big scan is better than several smaller ones.
 		auto drawRadardisc = pattern("D8 05 ? ? ? ? D9 1C 24 DB 05 ? ? ? ? 50 D8 0D ? ? ? ? D8 0D ? ? ? ? D8 05 ? ? ? ? D8 05 ? ? ? ? D9 1C 24 D9 C0 D8 25 ? ? ? ? 50 D9 1C 24 8D 8C 24 ? ? ? ? FF 35")
-								.get_one();
-		auto drawRadarMap = pattern("D8 05 ? ? ? ? D9 1C 24 50 D9 14 24 8D 4C 24 24 FF 35").get_one();
+			.get_one();
 
-		std::array<float**, 6> radarXPos = {
-			drawRadardisc.get<float*>(28 + 2),
-			drawRadardisc.get<float*>(34 + 2),
-			drawRadardisc.get<float*>(62 + 2),
-
-			get_pattern<float*>("D8 05 ? ? ? ? DE C1 D9 19", 2),
-			drawRadarMap.get<float*>(2),
-			drawRadarMap.get<float*>(17 + 2),
-		};
-
-		std::array<float**, 2> radarYPos = {
-			drawRadardisc.get<float*>(2),
-			drawRadardisc.get<float*>(45 + 2),
-		};
-
-		auto drawMap = get_pattern("0F 84 ? ? ? ? E8 ? ? ? ? 8D 8C 24", 6);
-
-		// Undo the damage caused by IVRadarScaling from the widescreen fix moving the radar way too far to the right
-		// It's moved from 40.0f to 71.0f, which is way too much now that we're scaling the horizontal placement correctly!
-		// This is removed from the most up-to-date widescreen fix, but keep it so we don't break with older builds.
-		try
+		// Fix subtitles attempting to make space for the radar and failing - finish the feature like Vice City did
+		if (const int INIoption = GetPrivateProfileIntW(L"SilentPatch", L"EnableSubtitleFixes", -1, wcModulePath); INIoption != -1) try
 		{
-			// Use exactly the same patterns as widescreen fix
-			float* radarPos = *get_pattern<float*>("D8 05 ? ? ? ? DE C1 D9 19 8B 15 ? ? ? ? 89 14 24", 2);
-			auto radarDisc1 = get_pattern("FF 35 ? ? ? ? DD D8 E8 ? ? ? ? B9 ? ? ? ? 50", 2);
-			auto radarDisc2 = get_pattern("D8 05 ? ? ? ? D8 05 ? ? ? ? D9 1C 24 D9 C0 D8 25 ? ? ? ? 50", 2);
+			using namespace SubtitleRadarCutoutFix;
 
-			if (hGameModule == ModCompat::Utils::GetModuleHandleFromAddress(radarPos) && *radarPos == (40.0f + 31.0f))
+			auto shadow_offset_and_print_string = pattern("D8 25 ? ? ? ? D9 1C 24 DE D9 DD D8 E8").get_one();
+			auto recalculate_values = get_pattern("E8 ? ? ? ? 59 59 E8 ? ? ? ? E8 ? ? ? ? 6A 00");
+			auto set_centre_size = get_pattern("DE D9 E8 ? ? ? ? 59 6A 01", 2);
+
+			auto set_centre_size_values = pattern("D9 05 ? ? ? ? D8 CA D8 C1 D9 05").get_one();
+			auto print_string_values = pattern("D9 05 ? ? ? ? D8 CB D8 C2 DD D9 D9 05").get_one();
+
+			std::array<float**, 2> broken_shadow_offsets = {
+				get_pattern<float*>("D8 25 ? ? ? ? D9 1C 24 8B 15", 2),
+				shadow_offset_and_print_string.get<float*>(2),
+			};
+
+			std::array<float**, 2> cutout_paddings = {
+				set_centre_size_values.get<float*>(10 + 2),
+				print_string_values.get<float*>(12 + 2)
+			};
+
+			std::array<float**, 2> radar_cutout_widths = {
+				set_centre_size_values.get<float*>(2),
+				print_string_values.get<float*>(2),
+			};
+
+			bWideScreenOn = *get_pattern<bool*>("74 0D 80 3D ? ? ? ? ? 0F 85 ? ? ? ? E8", 2 + 2);
+			orgRadarWidth = *drawRadardisc.get<float*>(22 + 2);
+			orgRadarBorderWidth = *drawRadardisc.get<float*>(34 + 2);
+
+			static const float fNoOffset = 0.0f;
+			for (float** shadow_offset : broken_shadow_offsets)
 			{
-				*radarPos = 40.0f;
+				Patch(shadow_offset, &fNoOffset);
+			}
 
-				static float STOCK_RADAR_POS = 40.0f;
-				static float STOCK_RADARDISC_POS = STOCK_RADAR_POS - 4.0f;
-				Patch(radarDisc1, &STOCK_RADARDISC_POS);
-				Patch(radarDisc2, &STOCK_RADAR_POS);
+			bEnableFix = INIoption != 0;
+			HookEach_PaddingSize(cutout_paddings, InterceptMemDisplacement);
+			HookEach_RadarXPos(radar_cutout_widths, InterceptMemDisplacement);
+
+			InterceptCall(shadow_offset_and_print_string.get<void>(13), orgPrintString, PrintString_CenterForCutscene);
+			InterceptCall(set_centre_size, orgSetCentreSize, SetCentreSize_CenterForCutscene);
+			InterceptCall(recalculate_values, orgSetScale, SetScale_RecalculateValues<radar_cutout_widths.size()>);
+
+			if (bHasDebugMenu)
+			{
+				DebugMenuAddVar("SilentPatch", "Subtitle placement fixes", &bEnableFix, nullptr);
 			}
 		}
 		TXN_CATCH();
 
-		HookEach_CalculateRadarXPos(radarXPos, InterceptMemDisplacement);
-		HookEach_CalculateRadarYPos(radarYPos, InterceptMemDisplacement);
-		InterceptCall(drawMap, orgDrawMap, DrawMap_RecalculatePositions<radarXPos.size(), radarYPos.size()>);
+		// Fix the radar disc shadow scaling and radar X position
+		try
+		{
+			using namespace RadardiscFixes;
+
+			auto drawRadarMap = pattern("D8 05 ? ? ? ? D9 1C 24 50 D9 14 24 8D 4C 24 24 FF 35").get_one();
+
+			std::array<float**, 6> radarXPos = {
+				drawRadardisc.get<float*>(28 + 2),
+				drawRadardisc.get<float*>(34 + 2),
+				drawRadardisc.get<float*>(62 + 2),
+
+				get_pattern<float*>("D8 05 ? ? ? ? DE C1 D9 19", 2),
+				drawRadarMap.get<float*>(2),
+				drawRadarMap.get<float*>(17 + 2),
+			};
+
+			std::array<float**, 2> radarYPos = {
+				drawRadardisc.get<float*>(2),
+				drawRadardisc.get<float*>(45 + 2),
+			};
+
+			auto drawMap = get_pattern("0F 84 ? ? ? ? E8 ? ? ? ? 8D 8C 24", 6);
+
+			// Undo the damage caused by IVRadarScaling from the widescreen fix moving the radar way too far to the right
+			// It's moved from 40.0f to 71.0f, which is way too much now that we're scaling the horizontal placement correctly!
+			// This is removed from the most up-to-date widescreen fix, but keep it so we don't break with older builds.
+			try
+			{
+				// Use exactly the same patterns as widescreen fix
+				float* radarPos = *get_pattern<float*>("D8 05 ? ? ? ? DE C1 D9 19 8B 15 ? ? ? ? 89 14 24", 2);
+				auto radarDisc1 = get_pattern("FF 35 ? ? ? ? DD D8 E8 ? ? ? ? B9 ? ? ? ? 50", 2);
+				auto radarDisc2 = get_pattern("D8 05 ? ? ? ? D8 05 ? ? ? ? D9 1C 24 D9 C0 D8 25 ? ? ? ? 50", 2);
+
+				if (hGameModule == ModCompat::Utils::GetModuleHandleFromAddress(radarPos) && *radarPos == (40.0f + 31.0f))
+				{
+					*radarPos = 40.0f;
+
+					static float STOCK_RADAR_POS = 40.0f;
+					static float STOCK_RADARDISC_POS = STOCK_RADAR_POS - 4.0f;
+					Patch(radarDisc1, &STOCK_RADARDISC_POS);
+					Patch(radarDisc2, &STOCK_RADAR_POS);
+				}
+			}
+			TXN_CATCH();
+
+			HookEach_CalculateRadarXPos(radarXPos, InterceptMemDisplacement);
+			HookEach_CalculateRadarYPos(radarYPos, InterceptMemDisplacement);
+			InterceptCall(drawMap, orgDrawMap, DrawMap_RecalculatePositions<radarXPos.size(), radarYPos.size()>);
+		}
+		TXN_CATCH();
 	}
 	TXN_CATCH();
 
