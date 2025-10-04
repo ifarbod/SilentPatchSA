@@ -6898,6 +6898,11 @@ void Patch_SA_10(HINSTANCE hInstance)
 	// By iFarbod
 	Patch<int8_t>(0x61E52E + 2, 0x11); // PED_TYPE_DEALER
 	Patch<int8_t>(0x61E533 + 2, 0x14); // PED_TYPE_CRIMINAL
+
+
+	// Fix CJ clones spawning in gang roadblocks in neutral zones
+	Patch(0x4613C2, { 0x39, 0x5C }); // cmp X, ebx
+	Patch<uint8_t>(0x4613C6, 0x7F); // jg X
 }
 
 void Patch_SA_11()
@@ -9184,6 +9189,17 @@ void Patch_SA_NewBinaries_Common(HINSTANCE hInstance)
 
 		Patch<int8_t>(set_move_anim.get<void>(2), 0x11); // PED_TYPE_DEALER
 		Patch<int8_t>(set_move_anim.get<void>(5 + 2), 0x14); // PED_TYPE_CRIMINAL
+	}
+	TXN_CATCH();
+
+
+	// Fix CJ clones spawning in gang roadblocks in neutral zones
+	try
+	{
+		auto generate_roadblock_cops = pattern("83 7D E0 FF 75").get_one();
+
+		Patch<int8_t>(generate_roadblock_cops.get<void>(3), 0); // cmp X, 0
+		Patch<uint8_t>(generate_roadblock_cops.get<void>(4), 0x7F); // jg X
 	}
 	TXN_CATCH();
 }
