@@ -1677,6 +1677,17 @@ namespace ConstructionSiteLODFix
 }
 
 
+// ============= Corona flares not scaling to resolution =============
+namespace CoronaFlaresScaling
+{
+	static void (*orgRenderOneXLUSprite)(void* x, void* y, void* z, float width, float height, void* r, void* g, void* b, void* intens, void* recipz, void* a);
+	static void RenderOneXLUSprite_Scale(void* x, void* y, void* z, float width, float height, void* r, void* g, void* b, void* intens, void* recipz, void* a)
+	{
+		orgRenderOneXLUSprite(x, y, z, width * UIScales::Stuff2d::Width(), height * UIScales::Stuff2d::Height(), r, g, b, intens, recipz, a);
+	}
+}
+
+
 namespace ModelIndicesReadyHook
 {
 	static void (*orgInitialiseObjectData)(const char*);
@@ -3452,6 +3463,18 @@ void Patch_VC_Common()
 		}
 		TXN_CATCH();
 	}
+
+
+	// Corona flares not scaling to resolution
+	try
+	{
+		using namespace CoronaFlaresScaling;
+
+		auto render_one_flare_sprite = get_pattern("E8 ? ? ? ? 83 C4 2C 83 C3 14");
+
+		InterceptCall(render_one_flare_sprite, orgRenderOneXLUSprite, RenderOneXLUSprite_Scale);
+	}
+	TXN_CATCH();
 }
 
 BOOL WINAPI DllMain(HINSTANCE hinstDLL, DWORD fdwReason, LPVOID lpvReserved)

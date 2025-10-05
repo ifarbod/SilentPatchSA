@@ -67,6 +67,7 @@ All the remaining, non-critical fixes.
 * Hitting vehicles and objects with a screwdriver now produces an impact sound.
 * Pedestrians and Tommy are now much more talkative, like in the PS2 version (integrated Ped Speech Patch from **Sergeanur**).
 * Tear gas can now deal damage to Tommy and other mission characters, like in the PS2 version.
+* Flare effects now scale to resolution correctly.
 * ⚙️ Fixed siren corona placements in Police, Firetruck, Ambulance, Enforcer, Vice Cheetah, and FBI Washington.
 * ⚙️ Added siren corona to FBI Washington.
 * ⚙️ Fixed taxi light corona placement for Taxi.

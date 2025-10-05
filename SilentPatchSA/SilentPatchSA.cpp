@@ -353,7 +353,6 @@ auto					IsPlayerOnAMission = AddressByVersion<bool(*)()>(0x464D50, {"85 C0 74 0
 static void				(__thiscall* SetVolume)(void*,float);
 static BOOL				(*IsAlreadyRunning)();
 static void				(*TheScriptsLoad)();
-static void				(*DoSunAndMoon)();
 
 auto 					WorldRemove = AddressByVersion<void(*)(CEntity*)>(0x563280, 0, 0x57D370, { "8B 06 8B 50 0C 8B CE FF D2 8A 46 36 24 07 3C 01 76 0D", -7 });
 
@@ -367,8 +366,6 @@ unsigned char&			nGameClockDays = **AddressByVersion<unsigned char**>(0x4E841D, 
 unsigned char&			nGameClockMonths = **AddressByVersion<unsigned char**>(0x4E842D, 0x4E887D, 0x4F3861);
 void*&					pUserTracksStuff = **AddressByVersion<void***>(0x4D9B7B, 0x4DA06C, 0x4E4A43);
 
-float&					fFarClipZ = **AddressByVersion<float**>(0x70D21F, 0x70DA4F, 0x421AB2);
-
 CZoneInfo*&				pCurrZoneInfo = **AddressByVersion<CZoneInfo***>(0x58ADB1, 0x58B581, 0x407F93);
 CRGBA*					HudColour = *AddressByVersion<CRGBA**>(0x58ADF6, 0x58B5C6, 0x440648);
 
@@ -379,7 +376,6 @@ uint32_t&				bDrawCrossHair = **AddressByVersion<uint32_t**>(0x58E7BF + 2, {"83 
 DebugMenuAPI gDebugMenuAPI;
 
 // Custom variables
-static float		fSunFarClip;
 static struct
 {
 	char			Extension[8];
@@ -1146,12 +1142,6 @@ CRGBA* __fastcall BlendGangColour_Dynamic(CRGBA* pThis, void*, uint8_t r, uint8_
 	}
 	*pThis = CRGBA(HudColour[3], a);
 	return pThis;
-}
-
-void SunAndMoonFarClip()
-{
-	fSunFarClip = std::min(1500.0f, fFarClipZ);
-	DoSunAndMoon();
 }
 
 // STEAM ONLY
@@ -3625,6 +3615,23 @@ namespace FixedLineWraps
 	};
 }
 
+
+// ============= Corona flares not scaling to resolution =============
+namespace CoronaFlaresScaling
+{
+	template<std::size_t Index>
+	static void (*orgRenderBufferedOneXLUSprite2D)(void* x, void* y, float width, float height, void* rgb, void* intens, void* a);
+	
+	template<std::size_t Index>
+	static void RenderBufferedOneXLUSprite2D_Scale(void* x, void* y, float width, float height, void* rgb, void* intens, void* a)
+	{
+		orgRenderBufferedOneXLUSprite2D<Index>(x, y, width * UIScales::Stuff2d::Width(), height * UIScales::Stuff2d::Height(), rgb, intens, a);
+	}
+
+	HOOK_EACH_INIT(RenderOneSprite, orgRenderBufferedOneXLUSprite2D, RenderBufferedOneXLUSprite2D_Scale);
+}
+
+
 // ============= LS-RP Mode stuff =============
 namespace LSRPMode
 {
@@ -4479,20 +4486,6 @@ BOOL InjectDelayedPatches_10()
 		}
 #endif
 
-		if ( GetPrivateProfileIntW(L"SilentPatch", L"SunSizeHack", -1, wcModulePath) == 1 )
-		{
-			// PS2 sun - more
-			static const float		fSunMult = (1050.0f * 0.95f) / 1500.0f;
-			Patch<const void*>(0x6FC5B0, &fSunMult);
-
-			if ( !bSAMP )
-			{
-				ReadCall( 0x53C136, DoSunAndMoon );
-				InjectHook(0x53C136, SunAndMoonFarClip);
-				Patch<const void*>(0x6FC5AA, &fSunFarClip);
-			}
-		}
-
 		if ( !bSARender )
 		{
 			// Alpha render states on rotors and propellers
@@ -5101,21 +5094,6 @@ BOOL InjectDelayedPatches_11()
 
 		ReadRotorFixExceptions(wcModulePath);
 
-		if ( GetPrivateProfileIntW(L"SilentPatch", L"SunSizeHack", -1, wcModulePath) == 1 )
-		{
-			// PS2 sun - more
-			static const float		fSunMult = (1050.0f * 0.95f) / 1500.0f;
-			Patch<const void*>(0x6FCDE0, &fSunMult);
-
-			if ( !bSAMP )
-			{
-				ReadCall( 0x53C5D6, DoSunAndMoon );
-				InjectHook(0x53C5D6, SunAndMoonFarClip);
-
-				Patch<const void*>(0x6FCDDA, &fSunFarClip);
-			}
-		}
-
 		if ( !bSARender )
 		{
 			// Alpha render states on rotors and propellers
@@ -5299,21 +5277,6 @@ BOOL InjectDelayedPatches_Steam()
 		}
 
 		ReadRotorFixExceptions(wcModulePath);
-
-		if ( GetPrivateProfileIntW(L"SilentPatch", L"SunSizeHack", -1, wcModulePath) == 1 )
-		{
-			// PS2 sun - more
-			static const double		dSunMult = (1050.0 * 0.95) / 1500.0;
-			Patch<const void*>(0x734DF0, &dSunMult);
-
-			if ( !bSAMP )
-			{
-				ReadCall( 0x54E0B6, DoSunAndMoon );
-				InjectHook(0x54E0B6, SunAndMoonFarClip);
-
-				Patch<const void*>(0x734DEA, &fSunFarClip);
-			}
-		}
 
 		if ( !bSARender )
 		{
@@ -6903,6 +6866,15 @@ void Patch_SA_10(HINSTANCE hInstance)
 	// Fix CJ clones spawning in gang roadblocks in neutral zones
 	Patch(0x4613C2, { 0x39, 0x5C }); // cmp X, ebx
 	Patch<uint8_t>(0x4613C6, 0x7F); // jg X
+
+
+	// Corona flares not scaling to resolution
+	{
+		using namespace CoronaFlaresScaling;
+
+		std::array<uintptr_t, 3> render_buffered_flare_sprite = { 0x6FB461, 0x6FB561, 0x6FB5EA };
+		HookEach_RenderOneSprite(render_buffered_flare_sprite, InterceptCall);
+	}
 }
 
 void Patch_SA_11()
@@ -7764,6 +7736,15 @@ void Patch_SA_NewBinaries_Common(HINSTANCE hInstance)
 	{
 		auto keys_exception_list = get_pattern("3D 08 04 00 00 74", 5);
 		Nop(keys_exception_list, 2);
+	}
+	TXN_CATCH();
+
+
+	// PS2 SUN!!!!!!!!!!!!!!!!!
+	try
+	{
+		auto force_z_test = get_pattern("FF D0 8B 4F D8");
+		Nop(force_z_test, 2);
 	}
 	TXN_CATCH();
 
@@ -9200,6 +9181,21 @@ void Patch_SA_NewBinaries_Common(HINSTANCE hInstance)
 
 		Patch<int8_t>(generate_roadblock_cops.get<void>(3), 0); // cmp X, 0
 		Patch<uint8_t>(generate_roadblock_cops.get<void>(4), 0x7F); // jg X
+	}
+	TXN_CATCH();
+
+
+	// Corona flares not scaling to resolution
+	try
+	{
+		using namespace CoronaFlaresScaling;
+
+		std::array<void*, 3> render_buffered_flare_sprite = {
+			get_pattern("E8 ? ? ? ? 83 C4 1C 83 C6 14"),
+			get_pattern("E8 ? ? ? ? 0F BF 4E 0C D9 7D F6"),
+			get_pattern("E8 ? ? ? ? 83 C6 14 83 C4 1C")
+		};
+		HookEach_RenderOneSprite(render_buffered_flare_sprite, InterceptCall);
 	}
 	TXN_CATCH();
 }

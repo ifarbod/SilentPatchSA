@@ -40,7 +40,9 @@ All the remaining, non-critical fixes.
 
 * ➕ The mouse's vertical axis sensitivity now matches the horizontal axis sensitivity.
 * ➕ The mouse's vertical axis does not lock during camera fade-ins now.
+* ➕ Coronas no longer have a Z test forced at all times - as a result, the sun glare now matches the original PS2 version.
 * ➕ Fixed sun lens flare effect not appearing with AMD/Intel graphics cards.
+* ➕ Flare effects now scale to resolution correctly.
 * ➕ Fixed an issue introducing graphical artifacts from ped animations with high RAM usage - the so-called "streaming memory bug".
 * ➕ Fixed a bug causing cheat-spawned melee weapons to be forcibly replaced by other melee weapons upon walking into a pickup.
 * ➕ Some car panels now swing after the car's explosion (like they were meant to be but the code forcibly fixed them immediately after damage).
@@ -109,6 +111,7 @@ All the remaining, non-critical fixes.
 * ➕ CJ no longer sinks inside the bike when jumping on it from the front (contributed by **B1ack_Wh1te**).
 * ➕ Characters entering the back of van vehicles will no longer sligthly teleport when playing the entering animation (contributed by **B1ack_Wh1te**).
 * ➕ Cops will no longer hold one handed weapons like gangsters. This behaviour is now given to dealers and criminals instead (contributed by **iFarbod**).
+* ➕ Specific roadblocks in 'End of the Line' will no longer spawn CJ's clones.
 * Detached vehicle parts will now keep the same color and lighting as the vehicle they came from.
 * Detached vehicle parts are now rendered from both sides.
 * Resolved single-pixel wide seams showing on the Map screen with Anti-Aliasing enabled.
@@ -138,7 +141,6 @@ All the remaining, non-critical fixes.
 * In addition, if the illumination value is absent from the timecycle (like on a stock PC timecycle), the game will now default to 1.0.
 * Lights now get cast on vehicles and peds properly - previously, they would disappear under some conditions.
 * Muzzle flash looks better now.
-* Coronas no longer have a Z test forced all the time - as a result, the sun glare now matches the original PS2 version.
 * With User Tracks automatic scan enabled, MP3 playback will now work properly if QuickTime is not installed.
 * PCM WAVE has been expanded to also accept additional profiles (Now 8/16/24bits, Mono/Stereo, and up to 48Khz).
 * PCM WAVE files with an ID3-TAG will now also work with the game.

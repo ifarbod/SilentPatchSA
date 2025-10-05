@@ -75,6 +75,7 @@ All the remaining, non-critical fixes.
 * Support for the `brakelights` dummy has been restored, allowing brake and reverse lights to work as they did in the PS2 version, rather than always sharing the same placement with the tail lights.
 * The correct window icon is now displayed.
 * The engine start sound now always plays correctly, regardless of the Dynamic Acoustic Modeling setting or environmental reverb.
+* Flare effects now scale to resolution correctly.
 * ⚙️ Fixed siren corona placements in Firetruck, Ambulance, and Enforcer.
 * ⚙️ Fixed taxi light corona placement for Taxi.
 * ⚙️ Fixed police chopper's searchlight placement.
