@@ -1777,6 +1777,7 @@ void InjectDelayedPatches_III_Common( bool bHasDebugMenu, const wchar_t* wcModul
 
 	const HMODULE skygfxModule = moduleList.Get(L"skygfx");
 	const HMODULE iiiAircraftModule = moduleList.Get(L"IIIAircraft");
+	const bool bLC01 = moduleList.GetByPrefix(L"LC01") != nullptr;
 	if (skygfxModule != nullptr)
 	{
 		auto attachCarPipe = reinterpret_cast<void(*)(RwObject*)>(GetProcAddress(skygfxModule, "AttachCarPipeToRwObject"));
@@ -1940,7 +1941,7 @@ void InjectDelayedPatches_III_Common( bool bHasDebugMenu, const wchar_t* wcModul
 
 
 	// Both these fixes touch the radar, and subtitles must go first, as they need to save the "unscaled" radardisc width
-	try
+	if (!bLC01) try
 	{
 		// We use this overkill pattern so we can get all those constants safely in one sweep. One big scan is better than several smaller ones.
 		auto drawRadardisc = pattern("D8 05 ? ? ? ? D9 1C 24 DB 05 ? ? ? ? 50 D8 0D ? ? ? ? D8 0D ? ? ? ? D8 05 ? ? ? ? D8 05 ? ? ? ? D9 1C 24 D9 C0 D8 25 ? ? ? ? 50 D9 1C 24 8D 8C 24 ? ? ? ? FF 35")
