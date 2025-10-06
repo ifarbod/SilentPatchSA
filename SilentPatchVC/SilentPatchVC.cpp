@@ -1688,6 +1688,16 @@ namespace CoronaFlaresScaling
 }
 
 
+// ============= Fix roadblock SWAT/FBI/Army not using their primary weapon =============
+namespace RoadblockCopWeapons
+{
+	static void __fastcall SetCurrentWeapon_NOP(void* /*ped*/, void*, void* /*weapon*/)
+	{
+		// Do nothing
+	}
+}
+
+
 namespace ModelIndicesReadyHook
 {
 	static void (*orgInitialiseObjectData)(const char*);
@@ -3473,6 +3483,19 @@ void Patch_VC_Common()
 		auto render_one_flare_sprite = get_pattern("E8 ? ? ? ? 83 C4 2C 83 C3 14");
 
 		InterceptCall(render_one_flare_sprite, orgRenderOneXLUSprite, RenderOneXLUSprite_Scale);
+	}
+	TXN_CATCH();
+
+
+	// Fix roadblock SWAT/FBI/Army not using their primary weapon
+	try
+	{
+		using namespace RoadblockCopWeapons;
+
+		// Disable a forced switch to COLT45 for "disabled cops" (NoPolice zones and roadblock cops).
+		// VC has no NoPolice zones anyway.
+		auto switch_to_colt = get_pattern("6A 11 E8 ? ? ? ? 0F BE 93 ? ? ? ? 8D 14 52", 2);
+		InjectHook(switch_to_colt, SetCurrentWeapon_NOP);
 	}
 	TXN_CATCH();
 }
