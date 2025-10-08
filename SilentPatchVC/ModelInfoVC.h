@@ -3,10 +3,14 @@
 #include <rwcore.h>
 #include <rpworld.h>
 
+#define MAX_MODEL_NAME (24)
+
 class CVehicleModelInfo
 {
 public:
-	uint8_t		 __pad1[40];
+	void*		 __vmt;
+	char		 m_name[MAX_MODEL_NAME];
+	uint8_t		 __pad1[12];
 	RpClump*	 m_clump;
 	uint8_t		 __pad3[16];
 	unsigned int m_dwType;
@@ -18,6 +22,7 @@ public:
 
 public:
 	RwFrame*		GetExtrasFrame( RpClump* clump );
+	const char*		GetModelName() const { return m_name; }
 
 	// For SkyGfx interop
 	static void AttachCarPipeToRwObject_Default(RwObject*) { }

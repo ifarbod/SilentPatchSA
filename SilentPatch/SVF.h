@@ -20,6 +20,7 @@ namespace SVF
 		VICE_CHEETAH_SIREN,
 
 		DRAW_BACKFACES, // Not vehicle specific, but it'll do
+		DONT_DRAW_BACKFACES,
 #endif
 
 #if _GTA_III || _GTA_VC
@@ -57,6 +58,8 @@ namespace SVF
 	void DisableStockVehiclesForFeature( Feature feature );
 	bool ModelHasFeature( int32_t modelID, Feature feature );
 	std::function<bool(Feature)> ForAllModelFeatures( int32_t modelID, std::function<bool(Feature)> pred );
+	bool ModelHasFeature( std::string modelName, Feature feature );
+	std::function<bool(Feature)> ForAllModelFeatures( std::string modelName, std::function<bool(Feature)> pred );
 
 	void RegisterGetModelInfoCB(void*(*func)(const char*, int*));
 	void MarkModelNamesReady();

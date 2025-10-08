@@ -1,12 +1,13 @@
 #include "SVF.h"
 
 #include <cstdint>
+#include <cctype>
 #include <algorithm>
 #include <map>
 
 namespace SVF
 {
-	Feature GetFeatureFromName( const char* featureName )
+	static Feature GetFeatureFromName( const char* featureName )
 	{
 		constexpr std::pair< const char*, Feature > features[] = {
 #if _GTA_III || _GTA_VC
@@ -45,18 +46,18 @@ namespace SVF
 	}
 
 	static int32_t nextFeatureCookie = 0;
-	int32_t _getCookie()
+	static int32_t _getCookie()
 	{
 		return nextFeatureCookie++;
 	}
 
 	static int32_t highestStockCookie = 0;
-	int32_t _getCookieStockID()
+	static int32_t _getCookieStockID()
 	{
 		return highestStockCookie = _getCookie();
 	}
 
-	auto _registerFeatureInternal( int32_t modelID, Feature feature )
+	static auto _registerFeatureInternal( int32_t modelID, Feature feature )
 	{
 		return std::make_pair( modelID, std::make_tuple( feature, _getCookieStockID() ) );
 	}
@@ -87,22 +88,34 @@ namespace SVF
 
 	static std::multimap<std::string, std::tuple<Feature, int32_t> > specialVehFeaturesByName;
 	static void* (*GetModelInfoCB)(const char* name, int* outIndex);
-	static bool bModelNamesReady = false;
+	static bool bModelNamesRefreshed = false;
 
-	void _resolveFeatureNamesInternal()
+	static void _resolveFeatureNamesInternal()
 	{
-		if (bModelNamesReady && GetModelInfoCB != nullptr && !specialVehFeaturesByName.empty())
+		if (bModelNamesRefreshed && GetModelInfoCB != nullptr && !specialVehFeaturesByName.empty())
 		{
-			for (const auto& feature : specialVehFeaturesByName)
+			bModelNamesRefreshed = false;
+			for (auto it = specialVehFeaturesByName.begin(); it != specialVehFeaturesByName.end();)
 			{
 				int32_t index;
-				if (GetModelInfoCB(feature.first.c_str(), &index) != nullptr)
+				if (GetModelInfoCB(it->first.c_str(), &index) != nullptr)
 				{
-					specialVehFeatures.emplace(index, feature.second);
+					specialVehFeatures.emplace(index, it->second);
+					it = specialVehFeaturesByName.erase(it);
+				}
+				else
+				{
+					++it;
 				}
 			}
-			specialVehFeaturesByName.clear();
 		}
+	}
+
+	static void _normalizeName(std::string& name)
+	{
+		std::transform(name.begin(), name.end(), name.begin(),
+			[](unsigned char c){ return static_cast<char>(std::tolower(c)); }
+		);
 	}
 
 	int32_t RegisterFeature( int32_t modelID, Feature feature )
@@ -118,6 +131,7 @@ namespace SVF
 	{
 		if ( feature == Feature::NO_FEATURE ) return -1;
 
+		_normalizeName(modelName);
 		const int32_t cookie = _getCookie();
 		specialVehFeaturesByName.emplace( std::move(modelName), std::make_tuple(feature, cookie) );
 		return cookie;
@@ -181,6 +195,20 @@ namespace SVF
 		} ) != results.second;
 	}
 
+	bool ModelHasFeature( std::string modelName, Feature feature )
+	{
+		_resolveFeatureNamesInternal();
+		if (!specialVehFeaturesByName.empty())
+		{
+			_normalizeName(modelName);
+			auto results = specialVehFeaturesByName.equal_range( modelName );
+			return std::find_if( results.first, results.second, [feature] ( const auto& e ) {
+				return std::get<Feature>(e.second) == feature;
+				} ) != results.second;
+		}
+		return false;
+	}
+
 	std::function<bool(Feature)> ForAllModelFeatures( int32_t modelID, std::function<bool(Feature)> pred )
 	{
 		_resolveFeatureNamesInternal();
@@ -195,6 +223,24 @@ namespace SVF
 		return pred;
 	}
 
+	std::function<bool(Feature)> ForAllModelFeatures( std::string modelName, std::function<bool(Feature)> pred )
+	{
+		_resolveFeatureNamesInternal();
+		if (!specialVehFeaturesByName.empty())
+		{
+			_normalizeName(modelName);
+			auto results = specialVehFeaturesByName.equal_range( modelName );
+			for ( auto it = results.first; it != results.second; ++it )
+			{
+				if (!pred(std::get<Feature>(it->second)))
+				{
+					break;
+				}
+			}
+		}
+		return pred;
+	}
+
 	void RegisterGetModelInfoCB(void*(*func)(const char*, int*))
 	{
 		GetModelInfoCB = func;
@@ -202,7 +248,7 @@ namespace SVF
 
 	void MarkModelNamesReady()
 	{
-		bModelNamesReady = true;
+		bModelNamesRefreshed = true;
 	}
 }
 

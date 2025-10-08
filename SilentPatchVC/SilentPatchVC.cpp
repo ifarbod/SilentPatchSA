@@ -1537,6 +1537,64 @@ namespace SelectableBackfaceCulling
 			else
 				SVF::RegisterFeature(ParseUtils::ParseString(str), SVF::Feature::DRAW_BACKFACES);
 		}
+
+		reader.Reset();
+		GetPrivateProfileSectionW(L"DontDrawBackfaces", reader.GetBuffer(), reader.GetSize(), pPath);
+		while (const wchar_t* str = reader.GetString())
+		{
+			auto modelID = ParseUtils::TryParseInt(str);
+			if (modelID)
+				SVF::RegisterFeature(*modelID, SVF::Feature::DONT_DRAW_BACKFACES);
+			else
+				SVF::RegisterFeature(ParseUtils::ParseString(str), SVF::Feature::DONT_DRAW_BACKFACES);
+		}
+	}
+
+	static bool bForceDisableBFC = false;
+	static std::optional<bool> TryGetBackfaceCullingOverride(int32_t modelID)
+	{
+		std::optional<bool> result;
+
+		if (bForceDisableBFC)
+		{
+			result = true;
+		}
+		else if (modelID != 0)
+		{
+			SVF::ForAllModelFeatures(modelID, [&result](SVF::Feature feature) -> bool
+				{
+					if (feature == SVF::Feature::DRAW_BACKFACES)
+					{
+						result = true;
+						return false;
+					}
+					if (feature == SVF::Feature::DONT_DRAW_BACKFACES)
+					{
+						result = false;
+						return false;
+					}
+					return true;
+				});
+		}
+		else
+		{
+			SVF::ForAllModelFeatures(ms_modelInfoPtrs[modelID]->GetModelName(), [&result](SVF::Feature feature) -> bool
+				{
+					if (feature == SVF::Feature::DRAW_BACKFACES)
+					{
+						result = true;
+						return false;
+					}
+					if (feature == SVF::Feature::DONT_DRAW_BACKFACES)
+					{
+						result = false;
+						return false;
+					}
+					return true;
+				});
+		}
+
+		return result;
 	}
 
 	// Only the parts of CObject we need
@@ -1578,6 +1636,12 @@ namespace SelectableBackfaceCulling
 			return false;
 		}
 
+		const std::optional<bool> DrawOverride = TryGetBackfaceCullingOverride(entity->m_modelIndex.Get());
+		if (DrawOverride.has_value())
+		{
+			return *DrawOverride;
+		}
+
 		// Always disable BFC on peds
 		if (entityType == 3)
 		{
@@ -1594,8 +1658,8 @@ namespace SelectableBackfaceCulling
 			}
 		}
 
-		// For everything else, check the exclusion list
-		return SVF::ModelHasFeature(entity->m_modelIndex.Get(), SVF::Feature::DRAW_BACKFACES);
+		// No overrides, no special cases, don't disable BFC
+		return false;
 	}
 
 	// If CEntity::Render is re-routed by another mod, we overwrite this later
@@ -2530,6 +2594,10 @@ void InjectDelayedPatches_VC_Common()
 	const bool hasDebugMenu = DebugMenuLoad();
 
 	SelectableBackfaceCulling::ReadDrawBackfacesExclusions(wcModulePath);
+	if (hasDebugMenu)
+	{
+		DebugMenuAddVar("SilentPatch", "Force backface culling off", &SelectableBackfaceCulling::bForceDisableBFC, nullptr);
+	}
 
 	InjectDelayedPatches_VC_Common( hasDebugMenu, wcModulePath );
 
