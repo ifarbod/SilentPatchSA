@@ -6875,6 +6875,14 @@ void Patch_SA_10(HINSTANCE hInstance)
 		std::array<uintptr_t, 3> render_buffered_flare_sprite = { 0x6FB461, 0x6FB561, 0x6FB5EA };
 		HookEach_RenderOneSprite(render_buffered_flare_sprite, InterceptCall);
 	}
+
+
+	// Fix the savegame loading not loading the number of tags correctly
+	{
+		void* loadData;
+		ReadCall(0x5D3DC4, loadData);
+		InjectHook(0x5D3DA8, loadData);
+	}
 }
 
 void Patch_SA_11()
@@ -9196,6 +9204,18 @@ void Patch_SA_NewBinaries_Common(HINSTANCE hInstance)
 			get_pattern("E8 ? ? ? ? 83 C6 14 83 C4 1C")
 		};
 		HookEach_RenderOneSprite(render_buffered_flare_sprite, InterceptCall);
+	}
+	TXN_CATCH();
+
+
+	// Fix the savegame loading not loading the number of tags correctly
+	try
+	{
+		auto tag_manager_load = pattern("B0 01 5E C3 CC CC CC CC 56 6A 04 68 ? ? ? ? E8 ? ? ? ? 33 F6 83 C4 08 39 35 ? ? ? ? 76 1E 57 BF ? ? ? ? 6A 01 57 E8").get_one();
+
+		void* loadData;
+		ReadCall(tag_manager_load.get<void>(0x2B), loadData);
+		InjectHook(tag_manager_load.get<void>(0x10), loadData);
 	}
 	TXN_CATCH();
 }
