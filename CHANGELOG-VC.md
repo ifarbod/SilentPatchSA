@@ -69,6 +69,7 @@ All the remaining, non-critical fixes.
 * Tear gas can now deal damage to Tommy and other mission characters, like in the PS2 version.
 * Flare effects now scale to resolution correctly.
 * SWAT, FBI, and Army standing by the police roadblocks now equip their weapons.
+* Fixed a bug where criminals mugging other peds would immediately cancel their objective.
 * ⚙️ Fixed siren corona placements in Police, Firetruck, Ambulance, Enforcer, Vice Cheetah, and FBI Washington.
 * ⚙️ Added siren corona to FBI Washington.
 * ⚙️ Fixed taxi light corona placement for Taxi.

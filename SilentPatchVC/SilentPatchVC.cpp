@@ -1762,6 +1762,21 @@ namespace RoadblockCopWeapons
 }
 
 
+// ============= Fix a broken mugging ped objective =============
+namespace PedMugObjectiveFix
+{
+	static void* PedMugObjectiveFix_JumpBack;
+	__declspec(naked) static void PedMugObjectiveFix_Wander()
+	{
+		_asm
+		{
+			mov     eax, [ebp+534h]
+			jmp		[PedMugObjectiveFix_JumpBack]
+		}
+	}
+}
+
+
 namespace ModelIndicesReadyHook
 {
 	static void (*orgInitialiseObjectData)(const char*);
@@ -3564,6 +3579,39 @@ void Patch_VC_Common()
 		// VC has no NoPolice zones anyway.
 		auto switch_to_colt = get_pattern("6A 11 E8 ? ? ? ? 0F BE 93 ? ? ? ? 8D 14 52", 2);
 		InjectHook(switch_to_colt, SetCurrentWeapon_NOP);
+	}
+	TXN_CATCH();
+
+
+	// Fix a broken mugging ped objective
+	try
+	{
+		using namespace PedMugObjectiveFix;
+
+		auto ped_objective_wander = pattern("8B 85 34 05 00 00 8B 15 ? ? ? ? 39 C2 76 2B").get_one();
+		auto ped_objective_break = get_pattern("8A 85 4F 01 00 00 C0 E8 06 24 01");
+		void** ped_objective_jump_table = *get_pattern<void**>("FF 24 85 ? ? ? ? 8B 8D 08 05 00 00", 3);
+
+		// The pointer to a "victim" CPed is obtained after it's cleared by CPed::ClearObjective(),
+		// so we swap the assignment instruction and the call around
+		auto clear_objective_get_victim = pattern("89 E9 E8 ? ? ? ? 8B BD 6C 01 00 00").get_one();
+
+		void* clear_objective;
+		ReadCall(clear_objective_get_victim.get<void>(2), clear_objective);
+		Patch(clear_objective_get_victim.get<void>(2), { 0x8B, 0xBD, 0x6C, 0x01, 0x00, 0x00 });
+		InjectHook(clear_objective_get_victim.get<void>(2 + 6), clear_objective, HookType::Call);
+
+		// Only proceed if no one else relocated the jump table
+		if (hGameModule == ModCompat::Utils::GetModuleHandleFromAddress(ped_objective_jump_table))
+		{
+			// Put a jmp to ped_objective_break at the start of ped_objective_wander,
+			// and then patch the switch case to patch OBJECTIVE_WANDER at our new code.
+			PedMugObjectiveFix_JumpBack = ped_objective_wander.get<void>(6);
+
+			InjectHook(ped_objective_wander.get<void>(), ped_objective_break, HookType::Jump);
+
+			Patch(&ped_objective_jump_table[47], &PedMugObjectiveFix_Wander);
+		}
 	}
 	TXN_CATCH();
 }
