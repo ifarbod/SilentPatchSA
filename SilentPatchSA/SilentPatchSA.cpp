@@ -5858,9 +5858,7 @@ void Patch_SA_10(HINSTANCE hInstance)
 	InjectHook(0x6A3569, &CAutomobile::Fix_SilentPatch, HookType::Jump);
 
 	// Patched CPlane::Fix
-	// Doors don't get reset (they can't get damaged anyway), bouncing panels DO reset
-	// but not on Vortex
-	Patch<BYTE>(0x6CABD0, 0xEB);
+	// Reset bouncing panels, except for Vortex
 	Patch<DWORD>(0x6CAC05, 0x5E5FCF8B);
 	InjectHook(0x6CAC09, &CPlane::Fix_SilentPatch, HookType::Jump);
 
@@ -7058,9 +7056,7 @@ void Patch_SA_11()
 	InjectHook(0x6A3D89, &CAutomobile::Fix_SilentPatch, HookType::Jump);
 
 	// Patched CPlane::Fix
-	// Doors don't get reset (they can't get damaged anyway), bouncing panels DO reset
-	// but not on Vortex
-	Patch<BYTE>(0x6CB3F0, 0xEB);
+	// Reset bouncing panels, except for Vortex
 	Patch<DWORD>(0x6CB425, 0x5E5FCF8B);
 	InjectHook(0x6CB429, &CPlane::Fix_SilentPatch, HookType::Jump);
 
@@ -7386,9 +7382,7 @@ void Patch_SA_Steam()
 	InjectHook(0x6D065D, &CAutomobile::Fix_SilentPatch, HookType::Jump);
 
 	// Patched CPlane::Fix
-	// Doors don't get reset (they can't get damaged anyway), bouncing panels DO reset
-	// but not on Vortex
-	Patch<BYTE>(0x700681, 0xEB);
+	// Reset bouncing panels, except for Vortex
 	Patch<DWORD>(0x7006B6, 0x5E5FCF8B);
 	InjectHook(0x7006BA, &CPlane::Fix_SilentPatch, HookType::Jump);
 
