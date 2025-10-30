@@ -3632,6 +3632,23 @@ namespace CoronaFlaresScaling
 }
 
 
+// ============= Sun size hack =============
+namespace SunSizeHack
+{
+	static bool bEnableHack = false;
+
+	static float* fFarClipZ;
+	static float fHackedFarClipZ;
+
+	static void (*orgDoSunAndMoon)();
+	static void DoSunAndMoon_SunSizeHack()
+	{
+		fHackedFarClipZ = bEnableHack ? std::min(*fFarClipZ, 600.0f) : *fFarClipZ;
+		orgDoSunAndMoon();
+	}
+}
+
+
 // ============= LS-RP Mode stuff =============
 namespace LSRPMode
 {
@@ -4486,6 +4503,21 @@ BOOL InjectDelayedPatches_10()
 		}
 #endif
 
+		if (const int INIoption = GetPrivateProfileIntW(L"SilentPatch", L"SunSizeHack", -1, wcModulePath); INIoption != -1 && !bSAMP)
+		{
+			using namespace SunSizeHack;
+
+			bEnableHack = INIoption != 0;
+
+			InterceptMemDisplacement(0x6FC5AA, fFarClipZ, fHackedFarClipZ);
+			InterceptCall(0x53C136, orgDoSunAndMoon, DoSunAndMoon_SunSizeHack);
+
+			if (bHasDebugMenu)
+			{
+				DebugMenuAddVar("SilentPatch", "Sun size hack", &bEnableHack, nullptr);
+			}
+		}
+
 		if ( !bSARender )
 		{
 			// Alpha render states on rotors and propellers
@@ -5094,6 +5126,14 @@ BOOL InjectDelayedPatches_11()
 
 		ReadRotorFixExceptions(wcModulePath);
 
+		if (!bSAMP && GetPrivateProfileIntW(L"SilentPatch", L"SunSizeHack", -1, wcModulePath) == 1)
+		{
+			using namespace SunSizeHack;
+
+			InterceptMemDisplacement(0x6FCDDA, fFarClipZ, fHackedFarClipZ);
+			InterceptCall(0x53C5D6, orgDoSunAndMoon, DoSunAndMoon_SunSizeHack);
+		}
+
 		if ( !bSARender )
 		{
 			// Alpha render states on rotors and propellers
@@ -5278,6 +5318,14 @@ BOOL InjectDelayedPatches_Steam()
 
 		ReadRotorFixExceptions(wcModulePath);
 
+		if (!bSAMP && GetPrivateProfileIntW(L"SilentPatch", L"SunSizeHack", -1, wcModulePath) == 1)
+		{
+			using namespace SunSizeHack;
+
+			InterceptMemDisplacement(0x734DEA, fFarClipZ, fHackedFarClipZ);
+			InterceptCall(0x54E0B6, orgDoSunAndMoon, DoSunAndMoon_SunSizeHack);
+		}
+
 		if ( !bSARender )
 		{
 			// Alpha render states on rotors and propellers
@@ -5437,6 +5485,25 @@ BOOL InjectDelayedPatches_NewBinaries()
 		PathRenameExtensionW(wcModulePath, L".ini");
 
 		const bool bHasDebugMenu = DebugMenuLoad();
+
+		if (const int INIoption = GetPrivateProfileIntW(L"SilentPatch", L"SunSizeHack", -1, wcModulePath); INIoption != -1) try
+		{
+			using namespace SunSizeHack;
+
+			auto do_sun_and_moon = get_pattern("E8 ? ? ? ? E8 ? ? ? ? E8 ? ? ? ? E8 ? ? ? ? A1 ? ? ? ? 85 C0", 5);
+			auto far_clip = get_pattern<float*>("D9 05 ? ? ? ? DC 0D ? ? ? ? 8D 04 40", 2);
+
+			bEnableHack = INIoption != 0;
+
+			InterceptMemDisplacement(far_clip, fFarClipZ, fHackedFarClipZ);
+			InterceptCall(do_sun_and_moon, orgDoSunAndMoon, DoSunAndMoon_SunSizeHack);
+
+			if (bHasDebugMenu)
+			{
+				DebugMenuAddVar("SilentPatch", "Sun size hack", &bEnableHack, nullptr);
+			}
+		}
+		TXN_CATCH();
 
 		// Race condition in CdStream fixed
 		// Not taking effect with modloader
