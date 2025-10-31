@@ -351,6 +351,14 @@ namespace Common {
 					}
 				}
 				TXN_CATCH();
+
+				// CPathFind::NewGenerateCarCreationCoors
+				try
+				{
+					auto rand = get_pattern("E8 ? ? ? ? 0F B7 C0 D9 EE D9 EE C1 F8 03 99");
+					InjectHook(rand, rand16);
+				}
+				TXN_CATCH();
 			}
 		}
 

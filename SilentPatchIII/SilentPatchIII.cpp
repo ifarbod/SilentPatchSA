@@ -7,6 +7,7 @@
 #include "Desktop.h"
 #include "VehicleIII.h"
 #include "ModelInfoIII.h"
+#include "Random.h"
 #include "RWUtils.hpp"
 #include "TheFLAUtils.h"
 #include "SVF.h"
@@ -3369,6 +3370,20 @@ void Patch_III_Common()
 		InterceptCall(render_one_flare_sprite, orgRenderOneXLUSprite, RenderOneXLUSprite_Scale);
 	}
 	TXN_CATCH();
+
+
+	// Fix various randomness factors expecting 16-bit rand()
+	{
+		using namespace ConsoleRandomness;
+
+		// CPathFind::GeneratePedCreationCoors
+		try
+		{
+			auto rand = get_pattern("E8 ? ? ? ? 0F B7 C0 D9 EE 99 F7 BE");
+			InjectHook(rand, rand16);
+		}
+		TXN_CATCH();
+	}
 }
 
 BOOL WINAPI DllMain(HINSTANCE hinstDLL, DWORD fdwReason, LPVOID lpvReserved)

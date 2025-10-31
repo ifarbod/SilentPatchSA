@@ -61,6 +61,7 @@ All the remaining, non-critical fixes.
 * Adjusted the probability of traffic vehicles turning on their lights to match the PS2 version, including a low chance that they may never turn them on.
 * Fixed an issue where vehicles exploded twice if the driver left the car before the explosion.
 * Script randomness is now 16-bit instead of 15-bit. This fixes checkpoint paths in  "Bling-bling Scramble" and ambulance routes in "Plaster Blaster" having variations previously inaccessible on PC.
+* Car and ped spawning generation now use 16-bit randomness, which fixes generation issues with bigger modded maps.
 * Lines read in `CPlane::LoadPath` and `CTrain::ReadAndInterpretTrackFile` are now null-terminated, fixing issues with plane/train paths under specific conditions in a modded game.
 * Environment mapping is now applied to vehicle extras. This gives Stinger a reflective, metallic roof.
 * Pedestrians trying to dive to avoid an oncoming car now dive correctly to the side, rather than jumping towards the threat.

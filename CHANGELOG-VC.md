@@ -53,6 +53,7 @@ All the remaining, non-critical fixes.
 * Adjusted the probability of traffic vehicles turning on their lights to match the PS2 version, including a low chance that they may never turn them on.
 * Fixed an issue where vehicles exploded twice if the driver left the car before the explosion.
 * Script randomness is now 16-bit instead of 15-bit.
+* Car spawning generation now uses 16-bit randomness, which fixes generation issues with bigger modded maps.
 * Lines read in `CPlane::LoadPath` and `CTrain::ReadAndInterpretTrackFile` are now null-terminated, fixing issues with plane/yacht paths under specific conditions in a modded game.
 * Environment mapping is now applied to vehicle extras.
 * Mouse sensitivity is no longer reset on starting a New Game.
