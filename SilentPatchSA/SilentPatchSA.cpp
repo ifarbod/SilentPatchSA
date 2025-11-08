@@ -873,12 +873,22 @@ static void MountainCloudBoysFix()
 	}
 }
 
+static void IceColdKillaFix()
+{
+	auto pattern = MakeScriptPattern(true, "06 B9 A6 27 45");
+	if (pattern.size() == 1) // Faulty (inverted) float under offet 3255
+	{
+		float& val = *pattern.get(0).get<float>(1);
+		val = -val;
+	}
+}
+
 static void SupplyLinesFix( bool isBeefyBaron )
 {
-	auto pattern = MakeScriptPattern(true, isBeefyBaron ? "B8 9E 3A 44" : "B8 1E 2F 44");
+	auto pattern = MakeScriptPattern(true, isBeefyBaron ? "06 B8 9E 3A 44" : "06 B8 1E 2F 44");
 	if ( pattern.size() == 1 ) // 700.48 -> 10.0 (teleports car with CJ under the building instead)
 	{
-		*pattern.get(0).get<float>() = 10.0f;
+		*pattern.get(0).get<float>(1) = 10.0f;
 	}
 }
 
@@ -1048,6 +1058,10 @@ static void StartNewMission_SCMFixes()
 	// WUZI1 - Mountain Cloud Boys fix
 	case 53:
 		MountainCloudBoysFix();
+		break;
+	// SYND4 - Ice Cold Killa fix
+	case 61:
+		IceColdKillaFix();
 		break;
 	// DSKOOL - Driving School cones fix
 	// By Wesser
@@ -6948,6 +6962,16 @@ void Patch_SA_10(HINSTANCE hInstance)
 		ReadCall(0x5D3DC4, loadData);
 		InjectHook(0x5D3DA8, loadData);
 	}
+
+
+	// Fix CREATE_BIRDS mis-interpreting coordinate arguments as integers
+	// fild -> fld
+	Patch(0x471967, { 0xD9, 0x05 });
+	Patch(0x471979, { 0xD9, 0x05 });
+	Patch(0x47198E, { 0xD9, 0x05 });
+	Patch(0x4719A0, { 0xD9, 0x05 });
+	Patch(0x4719B3, { 0xD9, 0x05 });
+	Patch(0x4719C7, { 0xD9, 0x05 });
 }
 
 void Patch_SA_11()
@@ -9277,6 +9301,24 @@ void Patch_SA_NewBinaries_Common(HINSTANCE hInstance)
 		void* loadData;
 		ReadCall(tag_manager_load.get<void>(0x2B), loadData);
 		InjectHook(tag_manager_load.get<void>(0x10), loadData);
+	}
+	TXN_CATCH();
+
+
+	// Fix CREATE_BIRDS mis-interpreting coordinate arguments as integers
+	try
+	{
+		// One big pattern that catches all fild's we want to patch
+		auto create_birds = pattern("DB 05 ? ? ? ? A1 ? ? ? ? 6A 00 D9 5D D8 8B 4D D8 DB 05 ? ? ? ? 50 A1 ? ? ? ? 50 D9 5D DC 8B 55 DC DB 05 ? ? ? ? 83 EC 0C 8B C4 83 EC 0C D9 5D E0 8B 75 E0 DB 05 ? ? ? ? 89 4D BC 89 55 C0 89 75 C4 D9 5D D8 8B 7D D8 DB 05 ? ? ? ? 89 38 D9 5D DC 8B 7D DC DB 05")
+				.get_one();
+
+		// fild -> fld
+		Patch(create_birds.get<void>(), { 0xD9, 0x05 });
+		Patch(create_birds.get<void>(0x13), { 0xD9, 0x05 });
+		Patch(create_birds.get<void>(0x26), { 0xD9, 0x05 });
+		Patch(create_birds.get<void>(0x3A), { 0xD9, 0x05 });
+		Patch(create_birds.get<void>(0x4F), { 0xD9, 0x05 });
+		Patch(create_birds.get<void>(0x5D), { 0xD9, 0x05 });
 	}
 	TXN_CATCH();
 }

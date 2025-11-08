@@ -113,6 +113,7 @@ All the remaining, non-critical fixes.
 * ➕ Cops will no longer hold one handed weapons like gangsters. This behaviour is now given to dealers and criminals instead (contributed by **iFarbod**).
 * ➕ Specific roadblocks in 'End of the Line' will no longer spawn CJ's clones.
 * ➕ Additional gang tags added through mods can now load from the save file correctly.
+* ➕ Fixed a broken CREATE_BIRDS script command. This fixes birds not spawning during the skylight cutscene in "Ice Cold Killa".
 * Detached vehicle parts will now keep the same color and lighting as the vehicle they came from.
 * Detached vehicle parts are now rendered from both sides.
 * Resolved single-pixel wide seams showing on the Map screen with Anti-Aliasing enabled.
