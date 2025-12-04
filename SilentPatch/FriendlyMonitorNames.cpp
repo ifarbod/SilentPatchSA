@@ -50,14 +50,14 @@ std::map<std::string, std::string, std::less<>> FriendlyMonitorNames::GetNamesFo
                     targetName.header.id = paths[i].targetInfo.id;
                     targetName.header.type = DISPLAYCONFIG_DEVICE_INFO_GET_TARGET_NAME;
                     targetName.header.size = sizeof(targetName);
-                    const LONG targetNameResult = DisplayConfigGetDeviceInfo(&targetName.header);
+                    const LONG targetNameResult = displayConfigGetDeviceInfo(&targetName.header);
 
                     DISPLAYCONFIG_SOURCE_DEVICE_NAME sourceName = {};
                     sourceName.header.adapterId = paths[i].sourceInfo.adapterId;
                     sourceName.header.id = paths[i].sourceInfo.id;
                     sourceName.header.type = DISPLAYCONFIG_DEVICE_INFO_GET_SOURCE_NAME;
                     sourceName.header.size = sizeof(sourceName);
-                    const LONG sourceNameResult = DisplayConfigGetDeviceInfo(&sourceName.header);
+                    const LONG sourceNameResult = displayConfigGetDeviceInfo(&sourceName.header);
                     if (targetNameResult == ERROR_SUCCESS && sourceNameResult == ERROR_SUCCESS && targetName.monitorFriendlyDeviceName[0] != '\0')
                     {
                         char gdiDeviceName[std::size(sourceName.viewGdiDeviceName)];
