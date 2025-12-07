@@ -234,7 +234,7 @@ namespace Common {
 			try
 			{
 				auto addr = get_pattern("c7 44 24 1c 00 00 00 00 c7 44 24 08 00 20 00", 0x4);
-				HICON wndIconIII = LoadIconA(GetModuleHandleA(nullptr), MAKEINTRESOURCEA(0x412)); // Group icon ID
+				HICON wndIconIII = LoadIcon(GetModuleHandle(nullptr), MAKEINTRESOURCE(0x412)); // Group icon ID
 
 				Patch<HICON>(addr, wndIconIII);
 			}
