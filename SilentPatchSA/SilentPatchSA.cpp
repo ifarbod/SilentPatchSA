@@ -3663,6 +3663,21 @@ namespace SunSizeHack
 }
 
 
+// ============= Display a fallback string if the resolution string is absent =============
+namespace AdvancedDisplaySettingsCrashFix
+{
+	void (*orgAsciiToGxtChar)(const char* src, char* dest);
+	void AsciiToGxtChar_NullCheck(const char* src, char* dest)
+	{
+		if (src == nullptr)
+		{
+			src = "-";
+		}
+		orgAsciiToGxtChar(src, dest);
+	}
+}
+
+
 // ============= LS-RP Mode stuff =============
 namespace LSRPMode
 {
@@ -6982,6 +6997,14 @@ void Patch_SA_10(HINSTANCE hInstance)
 	// Fake the VRAM poll, as it's used to limit resolutions for no reason
 	// Instead, assume that all polled resolutions can be used
 	InjectHook(0x7455E0, GetAvailableMemory_Fake, HookType::Jump);
+
+
+	// Display a fallback string if the resolution string is absent
+	// This mirrors a 1.01 fix for Advanced Display Settings crashing with 32MB VRAM
+	{
+		using namespace AdvancedDisplaySettingsCrashFix;
+		InterceptCall(0x57A071, orgAsciiToGxtChar, AsciiToGxtChar_NullCheck);
+	}
 }
 
 void Patch_SA_11()
@@ -9340,6 +9363,18 @@ void Patch_SA_NewBinaries_Common(HINSTANCE hInstance)
 	{
 		auto get_vram_func = get_pattern("55 8B EC 83 EC 14 6A 00");
 		InjectHook(get_vram_func, GetAvailableMemory_Fake, HookType::Jump);
+	}
+	TXN_CATCH();
+
+
+	// Display a fallback string if the resolution string is absent
+	// This mirrors a 1.01 fix for Advanced Display Settings crashing with 32MB VRAM
+	try
+	{
+		using namespace AdvancedDisplaySettingsCrashFix;
+
+		auto ascii_to_gxt_char = get_pattern("E8 ? ? ? ? 33 C0 83 C4 08 38 85");
+		InterceptCall(ascii_to_gxt_char, orgAsciiToGxtChar, AsciiToGxtChar_NullCheck);
 	}
 	TXN_CATCH();
 }

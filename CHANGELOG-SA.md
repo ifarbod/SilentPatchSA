@@ -14,7 +14,8 @@ Compatibility issues, crashes, progression blockers.
 * ➕ Fixed an issue that would cause games to freeze if III/VC/SA were running at the same time.
 * ➕ Fixed an occasional crash when minimizing the game while standing next to a mirror.
 * ➕ Fixed a crash on car explosions - most likely to happen when playing with a multi-monitor setup.
-* ➕ Fixed a crash when entering advanced display options on a dual monitor machine after: starting the game on the primary monitor in maximum resolution, exiting, starting again in maximum resolution on the secondary monitor. The secondary monitor's maximum resolution had to be greater than the maximum resolution of the primary monitor.
+* ➕ Fixed a crash when entering advanced display options on a dual monitor machine after: starting the game on the primary monitor in maximum resolution, exiting, starting again in maximum resolution on the secondary monitor. The secondary monitor's maximum resolution had to be greater than the maximum resolution of the primary monitor (like in the 1.01 patch).
+* ➕ Fixed a crash when entering Advanced Display Settings with 32MB VRAM (like in the 1.01 patch).
 * ➕ Fixed an occasional crash occurring when standing next to escalators.
 * ➕ Fixed a crash occurring when the vending machine was continuously used for an extended period.
 * ➕ Fixed a streaming-related deadlock, which could occasionally result in the game being stuck on a black screen when entering or exiting interiors (this is the issue people used to fix by setting CPU affinity to one core).
