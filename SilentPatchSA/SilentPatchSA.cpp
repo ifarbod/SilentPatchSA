@@ -5887,13 +5887,18 @@ void Patch_SA_10(HINSTANCE hInstance)
 #endif
 
 	// Unlocked widescreen resolutions
-	//Patch<DWORD>(0x745B71, 0x9090687D);
-	Patch<DWORD>(0x745B81, 0x9090587D);
-	Patch<DWORD>(0x74596C, 0x9090127D);
-	Nop(0x745970, 2);
-	//Nop(0x745B75, 2);
-	Nop(0x745B85, 2);
-	Nop(0x7459E1, 2);
+	{
+		// Advanced Display Options
+		Nop(0x745B71, 6); // Skip width check
+		Nop(0x745B81, 6); // Skip height check
+		Patch<uint8_t>(0x745B96, 0xEB); // Skip AR check
+		Nop(0x745BFC, 2); // Skip VRAM check
+
+		// Resolution selection dialog
+		Nop(0x74596C, 6); // Skip width check
+		Nop(0x74597A, 6); // Skip height check
+		Patch<uint8_t>(0x7459D0, 0xEB); // Skip AR check
+	}
 
 	// Heap corruption fix
 	Nop(0x5C25D3, 5);
@@ -7065,23 +7070,27 @@ void Patch_SA_11()
 	Nop(0x6FB9AC, 3);
 
 	// Unlocked widescreen resolutions
-	Patch<DWORD>(0x74619C, 0x9090127D);
-	Nop(0x7461A0, 2);
-	Nop(0x746222, 2);
+	{
+		// Resolution selection dialog
+		Nop(0x74619C, 6); // Skip width check
+		Nop(0x7461AA, 6); // Skip height check
+		Patch<uint8_t>(0x746200, 0xEB); // Skip AR check
 
-	if ( *(BYTE*)0x746333 == 0xE9 )
-	{
-		// securom'd EXE
-		// I better check if it's an address I want to patch, I don't want to break the game
-		if ( *(DWORD*)0x14E7387 == 0x00E48C0F )
+		// Advanced Display Options
+		if ( *(BYTE*)0x746333 == 0xE9 )
 		{
-			VP::Patch<DWORD>(0x14E7387, 0x90905D7D);
-			VP::Nop(0x14E738B, 2);
+			// securom'd EXE
+			// I better check if it's an address I want to patch, I don't want to break the game
+			if ( *(DWORD*)0x14E7387 == 0x00E48C0F )
+			{
+				VP::Patch<DWORD>(0x14E7387, 0x90905D7D);
+				VP::Nop(0x14E738B, 2);
+			}
 		}
-	}
-	else
-	{
-		// Sadly, this func is different in 1.01 - so I don't know the original offset
+		else
+		{
+			// Sadly, this func is different in 1.01 - so I don't know the original offset
+		}
 	}
 
 	// Heap corruption fix
@@ -7423,11 +7432,18 @@ void Patch_SA_Steam()
 	Nop(0x73362F, 2);
 
 	// Unlocked widescreen resolutions
-	//Patch<WORD>(0x77F9F0, 0x6E7D);
-	Patch<WORD>(0x77F9FC, 0x627D);
-	Patch<DWORD>(0x77F80B, 0x9090127D);
-	Nop(0x77F80F, 2);
-	Nop(0x77F880, 2);
+	{
+		// Advanced Display Options
+		Nop(0x77F9F0, 2); // Skip width check
+		Nop(0x77F9FC, 2); // Skip height check
+		Patch<uint8_t>(0x77FA0D, 0xEB); // Skip AR check
+		//Nop(0x77FA81, 2); // Skip VRAM check
+
+		// Resolution selection dialog
+		Nop(0x77F80B, 6); // Skip width check
+		Nop(0x77F819, 6); // Skip height check
+		Patch<uint8_t>(0x77F871, 0xEB); // Skip AR check
+	}
 
 	// Heap corruption fix
 	Nop(0x5D88AE, 5);
@@ -7844,38 +7860,28 @@ void Patch_SA_NewBinaries_Common(HINSTANCE hInstance)
 
 	// Unlocked widescreen resolutions
 	{
-		// Assume anybody could have changed those, so bail out if ANYTHING goes wrong
-		// However, all those patches are independent so try one by one
+		// Advanced Display Options
 		try
 		{
-			auto wsRes_jmpSrc = pattern( "81 F9 E0 01 00 00 7C").get_one();
-			auto wsRes1_jmpDest = pattern( "8B 45 EC 0F AF C2" ).get_one();
-
-			const uintptr_t jumpSource = reinterpret_cast<uintptr_t>(wsRes_jmpSrc.get<void>( 6 + 2 ));
-			const uintptr_t jumpDestination = reinterpret_cast<uintptr_t>(wsRes1_jmpDest.get<void>() );
-			const ptrdiff_t dist = jumpDestination - jumpSource;
-			// Can only do a short jump
-			if ( INT8_MIN <= dist && dist <= INT8_MAX )
-			{
-				// jnl 00B19C33
-				Patch( wsRes_jmpSrc.get<void>( 6 ), { 0x7D, static_cast<uint8_t>(dist) } );
-			}
+			auto checks1 = pattern("7C 50 8B 4D E8 81 F9 ? ? ? ? 7C 45 D9 45 FC D9 C0 D9 05 ? ? ? ? DA E9 DF E0 F6 C4 44 7B 43").get_one();
+			auto checks2 = get_pattern("76 AE 6A 00");
+			
+			Nop(checks1.get<void>(), 2); // Skip width check
+			Nop(checks1.get<void>(0xB), 2); // Skip height check
+			Patch<uint8_t>(checks1.get<void>(0x1F), 0xEB); // Skip AR check
+			Nop(checks2, 2); // Skip VRAM check
 		}
 		TXN_CATCH();
 
+		// Resolution selection dialog
 		try
 		{
-			auto wsRes2 = pattern( "0F 8C ? ? ? ? 81 7D ? ? ? ? ? 0F 8C" ).get_one();
+			auto checks1 = pattern("0F 8C ? ? ? ? 81 7D ? ? ? ? ? 0F 8C").get_one();
+			auto checks2 = get_pattern("7B 22 D9 C0 D9 05");
 
-			Nop( wsRes2.get<void>(), 4 );
-			Patch( wsRes2.get<void>( 4 ), { 0x7D, 0xD } );
-		}
-		TXN_CATCH();
-
-		try
-		{
-			auto wsRes3 = get_pattern( "7A 4D EB 02" );
-			Nop( wsRes3, 2 );
+			Nop(checks1.get<void>(), 6); // Skip width check
+			Nop(checks1.get<void>(0xD), 6); // Skip height check
+			Patch<uint8_t>(checks2, 0xEB); // Skip AR check
 		}
 		TXN_CATCH();
 	}
