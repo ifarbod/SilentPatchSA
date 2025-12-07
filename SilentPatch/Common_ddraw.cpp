@@ -1,5 +1,7 @@
 #include "Common_ddraw.h"
 
+#include "Desktop.h"
+
 #define WIN32_LEAN_AND_MEAN
 
 #define WINVER 0x0501
@@ -16,6 +18,22 @@
 #pragma comment(lib, "shlwapi.lib")
 
 extern char** ppUserFilesDir;
+
+// ============= Fake the VRAM poll =============
+namespace FakeVRAMPoll
+{
+	static uint32_t* s_TotalVidMem;
+	static uint32_t* s_AvailableVidMem;
+	HRESULT WINAPI DirectDrawCreateEx_Fake(void* /*lpGuid*/, void** lplpDD, void* /*iid*/, void* /*pUnkOuter*/)
+	{
+		*lplpDD = nullptr;
+		GetAvailableMemory_Fake(s_TotalVidMem, s_AvailableVidMem);
+
+		// Return a fake failure code so the code path using DDraw doesn't get executed at all
+		return E_FAIL;
+	}
+}
+
 
 namespace Common {
 	char* GetMyDocumentsPath()
@@ -86,9 +104,6 @@ namespace Common {
 			}
 			Patch<BYTE>(0x581E72, 32);
 
-			// No 12mb vram check
-			Patch<BYTE>(0x581411, 0xEB);
-
 			// No DirectPlay dependency
 			Patch<BYTE>(0x5812D6, 0xB8);
 			Patch<DWORD>(0x5812D7, 0x900);
@@ -108,9 +123,6 @@ namespace Common {
 			}
 			Patch<BYTE>(0x5821B2, 32);
 
-			// No 12mb vram check
-			Patch<BYTE>(0x581753, 0xEB);
-
 			// No DirectPlay dependency
 			Patch<BYTE>(0x581620, 0xB8);
 			Patch<DWORD>(0x581621, 0x900);
@@ -129,9 +141,6 @@ namespace Common {
 				Patch<const char*>(0x5820D8, desktopText);
 			}
 			Patch<BYTE>(0x5820A2, 32);
-
-			// No 12mb vram check
-			Patch<BYTE>(0x581653, 0xEB);
 
 			// No DirectPlay dependency
 			Patch<BYTE>(0x581520, 0xB8);
@@ -156,9 +165,6 @@ namespace Common {
 			}
 			Patch<BYTE>(0x600E92, 32);
 
-			// No 12mb vram check
-			Patch<BYTE>(0x601E26, 0xEB);
-
 			// No DirectPlay dependency
 			Patch<BYTE>(0x601CA0, 0xB8);
 			Patch<DWORD>(0x601CA1, 0x900);
@@ -180,9 +186,6 @@ namespace Common {
 				Patch<const char*>(0x600EE8, desktopText);
 			}
 			Patch<BYTE>(0x600EB2, 32);
-
-			// No 12mb vram check
-			Patch<BYTE>(0x601E56, 0xEB);
 
 			// No DirectPlay dependency
 			Patch<BYTE>(0x601CD0, 0xB8);
@@ -206,9 +209,6 @@ namespace Common {
 				Patch<const char*>(0x600B28, desktopText);
 			}
 			Patch<BYTE>(0x600AF2, 32);
-
-			// No 12mb vram check
-			Patch<BYTE>(0x601A96, 0xEB);
 
 			// No DirectPlay dependency
 			Patch<BYTE>(0x601910, 0xB8);
@@ -257,6 +257,32 @@ namespace Common {
 				Nop( mem.get<void>( 0x25 + 2 ), 3 );			
 			}
 			TXN_CATCH();
+
+			// Fake the VRAM poll
+			{
+				// III/VC
+				try
+				{
+					auto get_vram_func = get_pattern("57 55 83 EC 18 8D 44 24 04");
+					InjectHook(get_vram_func, GetAvailableMemory_Fake, HookType::Jump);
+				}
+				TXN_CATCH();
+
+				// VC only, one of the calls got inlined
+				try
+				{
+					using namespace FakeVRAMPoll;
+
+					auto direct_draw_create = get_pattern("E8 ? ? ? ? 85 C0 7C 44");
+					auto vid_mem_variables = pattern("68 ? ? ? ? 68 ? ? ? ? AB").get_one();
+
+					s_AvailableVidMem = *vid_mem_variables.get<uint32_t*>(1);
+					s_TotalVidMem = *vid_mem_variables.get<uint32_t*>(5 + 1);
+
+					InjectHook(direct_draw_create, DirectDrawCreateEx_Fake);
+				}
+				TXN_CATCH();
+			}
 		}
 	}
 }

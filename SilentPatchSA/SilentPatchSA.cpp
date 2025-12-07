@@ -6977,6 +6977,11 @@ void Patch_SA_10(HINSTANCE hInstance)
 	Patch(0x4719A0, { 0xD9, 0x05 });
 	Patch(0x4719B3, { 0xD9, 0x05 });
 	Patch(0x4719C7, { 0xD9, 0x05 });
+
+
+	// Fake the VRAM poll, as it's used to limit resolutions for no reason
+	// Instead, assume that all polled resolutions can be used
+	InjectHook(0x7455E0, GetAvailableMemory_Fake, HookType::Jump);
 }
 
 void Patch_SA_11()
@@ -9325,6 +9330,16 @@ void Patch_SA_NewBinaries_Common(HINSTANCE hInstance)
 		Patch(create_birds.get<void>(0x3A), { 0xD9, 0x05 });
 		Patch(create_birds.get<void>(0x4F), { 0xD9, 0x05 });
 		Patch(create_birds.get<void>(0x5D), { 0xD9, 0x05 });
+	}
+	TXN_CATCH();
+
+
+	// Fake the VRAM poll, as it's used to limit resolutions for no reason
+	// Instead, assume that all polled resolutions can be used
+	try
+	{
+		auto get_vram_func = get_pattern("55 8B EC 83 EC 14 6A 00");
+		InjectHook(get_vram_func, GetAvailableMemory_Fake, HookType::Jump);
 	}
 	TXN_CATCH();
 }

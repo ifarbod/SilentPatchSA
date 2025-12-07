@@ -22,3 +22,9 @@ std::pair<uint32_t, uint32_t> GetDesktopResolution()
 	}
 	return result;
 }
+
+int32_t GetAvailableMemory_Fake(uint32_t* totalVRAM, uint32_t* availableVRAM)
+{
+	*totalVRAM = *availableVRAM = 0xFFFF0000u;
+	return 0; // S_OK
+}
