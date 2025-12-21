@@ -51,6 +51,8 @@ All the remaining, non-critical fixes.
 * ➕ Fixed a glitch where random cars would end up being impounded to the garage, replacing player's vehicles.
 * ➕ Impound garages can now only impound cars and bikes, as other vehicle types are either too big or cannot leave the garage.
 * ➕ A muzzle flash will now show up when firing the last bullet from the clip.
+* ➕ If the illumination value is absent from the timecycle file (like on the default PC timecycle), it will now default to 1.0.
+* ➕ A red-tinted countryside evening rain weather that occurs with the default PC timecycle file has been fixed.
 * ➕ Script sprites now have bilinear filtering applied.
 * ➕ Car generator counters now work properly for generators with a fixed number of spawns.
 * ➕ Randomizer error causing peds not to spawn in some areas has been fixed.
@@ -141,7 +143,6 @@ All the remaining, non-critical fixes.
 * Moonphases now show up correctly, like on the PS2 version (only when playing in 32-bit color mode).
 * Toggling car lights on does not make windows invisible when viewed from inside anymore.
 * Illumination value from timecyc.dat now accepts any float value in 0.0-2.0 ranges, not just 0.0, 1.0, and 2.0.
-* In addition, if the illumination value is absent from the timecycle (like on a stock PC timecycle), the game will now default to 1.0.
 * Lights now get cast on vehicles and peds properly - previously, they would disappear under some conditions.
 * Muzzle flash looks better now.
 * With User Tracks automatic scan enabled, MP3 playback will now work properly if QuickTime is not installed.

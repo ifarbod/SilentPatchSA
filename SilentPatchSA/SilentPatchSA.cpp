@@ -3678,6 +3678,62 @@ namespace AdvancedDisplaySettingsCrashFix
 }
 
 
+// ============= Fix the missing directional multiplier and a broken RAINY_COUNTRYSIDE in PC timecyc.dat =============
+namespace TimecycDatMissingDataFix
+{
+	static int (*orgSscanf)(const char* s, const char* format, ...);
+	static int sscanf_TimecycLine(const char* s, const char* format, int* Amb_R, int* Amb_G, int* Amb_B, int* Amb_Obj_R, int* Amb_Obj_G, int* Amb_Obj_B, int* Dir_R, int* Dir_G, int* Dir_B,
+			int* SkyTop_R, int* SkyTop_G, int* SkyTop_B, int* SkyBot_R, int* SkyBot_G, int* SkyBot_B, int* SunCore_R, int* SunCore_G, int* SunCore_B, int* SunCorona_R, int* SunCorona_G, int* SunCorona_B,
+			float* SunSz, float* SprSz, float* SprBght, int* Shdw, int* LightShd, int* PoleShd, float* FarClp, float* FogSt, float* LightOnGround, int* LowCloudsR, int* LowCloudsG, int* LowCloudsB,
+			int* BottomCloudR, int* BottomCloudG, int* BottomCloudB, float* WaterR, float* WaterG, float* WaterB, float* WaterA, float* PostFX1_A, float* PostFX1_R, float* PostFX1_G, float* PostFX1_B,
+			float* PostFX2_A, float* PostFX2_R, float* PostFX2_G, float* PostFX2_B, float* Cloud_A, int* HighlightMin, int* WaterFogAlpha, float* DirLightMult)
+	{
+		constexpr int NUM_EXPECTED_PARAMS = 52;
+
+		static int LastAmb_R, LastAmb_G, LastAmb_B;
+		int CurAmb_R = 0, CurAmb_G = 0, CurAmb_B = 0;
+
+		// Give the directional multiplier a graceful default
+		*DirLightMult = 1.0f;
+
+		const int result = orgSscanf(s, format, &CurAmb_R, &CurAmb_G, &CurAmb_B, Amb_Obj_R, Amb_Obj_G, Amb_Obj_B, Dir_R, Dir_G, Dir_B,
+			SkyTop_R, SkyTop_G, SkyTop_B, SkyBot_R, SkyBot_G, SkyBot_B, SunCore_R, SunCore_G, SunCore_B, SunCorona_R, SunCorona_G, SunCorona_B,
+			SunSz, SprSz, SprBght, Shdw, LightShd, PoleShd, FarClp, FogSt, LightOnGround, LowCloudsR, LowCloudsG, LowCloudsB,
+			BottomCloudR, BottomCloudG, BottomCloudB, WaterR, WaterG, WaterB, WaterA, PostFX1_A, PostFX1_R, PostFX1_G, PostFX1_B,
+			PostFX2_A, PostFX2_R, PostFX2_G, PostFX2_B, Cloud_A, HighlightMin, WaterFogAlpha, DirLightMult);
+
+		// We expect the directional multiplier to be missing, but RAINY_COUNTRYSIDE is missing the first two values, and the third is corrupted.
+		// So if at least 3 variables fail to parse, try the fallback
+		if (result <= (NUM_EXPECTED_PARAMS-3))
+		{
+			// String format matching the broken line
+			orgSscanf(s, "%*d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %f %f %f %d %d %d %f %f %f %d %d %d %d %d %d %f %f %f %f %f %f %f %f %f %f %f %f %f %d %d %f",
+				Amb_Obj_R, Amb_Obj_G, Amb_Obj_B, Dir_R, Dir_G, Dir_B,
+				SkyTop_R, SkyTop_G, SkyTop_B, SkyBot_R, SkyBot_G, SkyBot_B, SunCore_R, SunCore_G, SunCore_B, SunCorona_R, SunCorona_G, SunCorona_B,
+				SunSz, SprSz, SprBght, Shdw, LightShd, PoleShd, FarClp, FogSt, LightOnGround, LowCloudsR, LowCloudsG, LowCloudsB,
+				BottomCloudR, BottomCloudG, BottomCloudB, WaterR, WaterG, WaterB, WaterA, PostFX1_A, PostFX1_R, PostFX1_G, PostFX1_B,
+				PostFX2_A, PostFX2_R, PostFX2_G, PostFX2_B, Cloud_A, HighlightMin, WaterFogAlpha, DirLightMult);
+
+			CurAmb_R = LastAmb_R;
+			CurAmb_G = LastAmb_G;
+			CurAmb_B = LastAmb_B;
+		}
+		else
+		{
+			// Preserve the ambient values from a valid line
+			LastAmb_R = CurAmb_R;
+			LastAmb_G = CurAmb_G;
+			LastAmb_B = CurAmb_B;
+		}
+		*Amb_R = CurAmb_R;
+		*Amb_G = CurAmb_G;
+		*Amb_B = CurAmb_B;
+
+		return result;
+	}
+}
+
+
 // ============= LS-RP Mode stuff =============
 namespace LSRPMode
 {
@@ -5986,8 +6042,11 @@ void Patch_SA_10(HINSTANCE hInstance)
 	// Directional multiplier value from timecyc.dat properly using floats
 	Patch<WORD>(0x5BBFC9, 0x14EB);
 
-	// Directional multiplier defaults to 1.0f
-	Patch( 0x5BBB04, { 0xC7, 0x84, 0x24, 0xCC, 0x00, 0x00, 0x00, 0x00, 0x00, 0x80, 0x3F, 0x90 } );
+	// Directional multiplier defaults to 1.0f, and work around a broken RAINY_COUNTRYSIDE line in PC timecyc.dat
+	{
+		using namespace TimecycDatMissingDataFix;
+		InterceptCall(0x5BBCE2, orgSscanf, sscanf_TimecycLine);
+	}
 
 	// All lights get casted at vehicles
 	Patch<BYTE>(0x5D9A88, 8);
@@ -8252,6 +8311,17 @@ void Patch_SA_NewBinaries_Common(HINSTANCE hInstance)
 		Patch<const void*>(calculateAr.get<void>( 2 + 2 ), &f169);
 		Patch<const void*>(calculateAr.get<void>( 0x1E + 2 ), &f54);
 		Patch<const void*>(calculateAr.get<void>( 0x31 + 2 ), &f43);
+	}
+	TXN_CATCH();
+
+
+	// Directional multiplier defaults to 1.0f, and work around a broken RAINY_COUNTRYSIDE line in PC timecyc.dat
+	try
+	{
+		auto timecyc_sscanf = get_pattern("50 E8 ? ? ? ? D9 45 9C", 1);
+
+		using namespace TimecycDatMissingDataFix;
+		InterceptCall(timecyc_sscanf, orgSscanf, sscanf_TimecycLine);
 	}
 	TXN_CATCH();
 
