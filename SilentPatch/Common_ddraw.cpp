@@ -61,19 +61,10 @@ namespace Common {
 		{
 			using namespace hook::txn;
 
-			// _rwcseg can be placed far after the code section, and the default pattern heuristics currently break with it
-			// (it's only using SizeOfCode instead of scanning all code sections).
-			// To fix this, explicitly scan the entire module
-			const uintptr_t module = reinterpret_cast<uintptr_t>(GetModuleHandle(nullptr));
-			PIMAGE_DOS_HEADER dosHeader = reinterpret_cast<PIMAGE_DOS_HEADER>(module);
-			PIMAGE_NT_HEADERS ntHeader = reinterpret_cast<PIMAGE_NT_HEADERS>(module + dosHeader->e_lfanew);
+			const scan_segments segments = get_all_readable_sections(GetModuleHandle(nullptr));
 
-			const uintptr_t sizeOfHeaders = ntHeader->OptionalHeader.SizeOfHeaders;
-			const uintptr_t moduleBegin = module + sizeOfHeaders;
-			const uintptr_t moduleEnd = module + (ntHeader->OptionalHeader.SizeOfImage - sizeOfHeaders);
-
-			auto begin = make_range_pattern(moduleBegin, moduleEnd, "55 8B EC 50 53 51 52 8B 5D 14 8B 4D 10 8B 45 0C 8B 55 08").get_first<void>();
-			auto end = make_range_pattern(moduleBegin, moduleEnd, "9B D9 3D ? ? ? ? 81 25 ? ? ? ? FF FC FF FF 83 0D ? ? ? ? 3F").get_first<void>(31);
+			auto begin = get_pattern(segments, "55 8B EC 50 53 51 52 8B 5D 14 8B 4D 10 8B 45 0C 8B 55 08");
+			auto end = get_pattern(segments, "9B D9 3D ? ? ? ? 81 25 ? ? ? ? FF FC FF FF 83 0D ? ? ? ? 3F", 31);
 
 			const ptrdiff_t size = reinterpret_cast<uintptr_t>(end) - reinterpret_cast<uintptr_t>(begin);
 			if ( size > 0 )

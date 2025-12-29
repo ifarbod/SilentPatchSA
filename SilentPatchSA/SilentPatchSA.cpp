@@ -844,7 +844,7 @@ static void SweetsGirlFix()
 		*(uint16_t*)(ScriptSpace+ScriptFileSize+2680) = 0x0029;
 }
 
-static hook::pattern MakeScriptPattern(bool isMission, std::string_view bytes)
+static hook::scan_segments MakeScriptScanSegment(bool isMission)
 {
 	uintptr_t begin, end;
 	if (isMission)
@@ -857,12 +857,12 @@ static hook::pattern MakeScriptPattern(bool isMission, std::string_view bytes)
 		begin = uintptr_t(ScriptSpace);
 		end = begin + ScriptFileSize;
 	}
-	return hook::make_range_pattern(begin, end, bytes);
+	return {{ begin, end }};
 }
 
 static void MountainCloudBoysFix()
 {
-	auto pattern = MakeScriptPattern(true, "D6 00 04 00 39 00 03 EF 00 04 02 4D 00 01 90 F2 FF FF D6 00 04 01");
+	auto pattern = hook::pattern(MakeScriptScanSegment(true), "D6 00 04 00 39 00 03 EF 00 04 02 4D 00 01 90 F2 FF FF D6 00 04 01");
 	if ( pattern.size() == 1 ) // Faulty code lies under offset 3367 - replace it if it matches
 	{
 		const uint8_t bNewCode[22] = {
@@ -875,7 +875,7 @@ static void MountainCloudBoysFix()
 
 static void IceColdKillaFix()
 {
-	auto pattern = MakeScriptPattern(true, "06 B9 A6 27 45");
+	auto pattern = hook::pattern(MakeScriptScanSegment(true), "06 B9 A6 27 45");
 	if (pattern.size() == 1) // Faulty (inverted) float under offet 3255
 	{
 		float& val = *pattern.get(0).get<float>(1);
@@ -885,7 +885,7 @@ static void IceColdKillaFix()
 
 static void SupplyLinesFix( bool isBeefyBaron )
 {
-	auto pattern = MakeScriptPattern(true, isBeefyBaron ? "06 B8 9E 3A 44" : "06 B8 1E 2F 44");
+	auto pattern = hook::pattern(MakeScriptScanSegment(true), isBeefyBaron ? "06 B8 9E 3A 44" : "06 B8 1E 2F 44");
 	if ( pattern.size() == 1 ) // 700.48 -> 10.0 (teleports car with CJ under the building instead)
 	{
 		*pattern.get(0).get<float>(1) = 10.0f;
@@ -894,9 +894,10 @@ static void SupplyLinesFix( bool isBeefyBaron )
 
 static void DrivingSchoolConesFix()
 {
-	auto pattern = MakeScriptPattern(true, "04 00 02 20 03 04 00 D6 00 04 00 1A 00 04 2E 02 20 03 4D 00 01 60 75 FF FF BE 00 08 01 07 24 03 20 03 2E 80 08 00 02 20 03 04 01");
-	auto coneCoilConeCount = MakeScriptPattern(true, "1A 00 04 17 02 20 03");
-	auto burnAndLapConeCount = MakeScriptPattern(true, "1A 00 04 23 02 20 03");
+	auto segment = MakeScriptScanSegment(true);
+	auto pattern = hook::pattern(segment, "04 00 02 20 03 04 00 D6 00 04 00 1A 00 04 2E 02 20 03 4D 00 01 60 75 FF FF BE 00 08 01 07 24 03 20 03 2E 80 08 00 02 20 03 04 01");
+	auto coneCoilConeCount = hook::pattern(segment, "1A 00 04 17 02 20 03");
+	auto burnAndLapConeCount = hook::pattern(segment, "1A 00 04 23 02 20 03");
 	// Only destroy as many cones as were created, and correct trafficcone_counter for "Cone Coil" and "Burn and Lap"
 	if (pattern.size() == 1 && coneCoilConeCount.size() == 1 && burnAndLapConeCount.size() == 1)
 	{
@@ -927,7 +928,7 @@ static void DrivingSchoolConesFix()
 
 static void BikeSchoolConesFix()
 {
-	auto pattern = MakeScriptPattern(true, "04 00 02 20 03 04 00 D6 00 04 00 1A 00 04 2E 02 20 03 4D 00 01 F8 AD FF FF 08 01 07 24 03 20 03 2E 80 08 00 02 20 03 04 01");
+	auto pattern = hook::pattern(MakeScriptScanSegment(true), "04 00 02 20 03 04 00 D6 00 04 00 1A 00 04 2E 02 20 03 4D 00 01 F8 AD FF FF 08 01 07 24 03 20 03 2E 80 08 00 02 20 03 04 01");
 	if (pattern.size() == 1) // Only destroy as many cones as were created
 	{
 		const uint8_t gotoSkipAssignment[] = { 0x02, 0x00, 0x01, 0x21, 0xAE, 0xFF, 0xFF };
@@ -951,8 +952,9 @@ static void AirRaidFix()
 	// Give the player back their weapon from the 8th slot instead of stealing it,
 	// but do it properly and load the model before giving the wepaon.
 	// 1.01 PC script saves and restores the weapon, but forgets to load the model.
-	auto save_weapon_gosub_place = MakeScriptPattern(true, "BD 01 03 65 01 06 00 03 48 01 04 00");
-	auto free_space_after_mission = MakeScriptPattern(true, "EF 04 0E 06 43 41 53 49 4E 4F EF 04 0E 0A 4F 4E 5F 4C 4F 4F 4B 45 52 53 D8 00 51 00");
+	auto segment = MakeScriptScanSegment(true);
+	auto save_weapon_gosub_place = hook::pattern(segment, "BD 01 03 65 01 06 00 03 48 01 04 00");
+	auto free_space_after_mission = hook::pattern(segment, "EF 04 0E 06 43 41 53 49 4E 4F EF 04 0E 0A 4F 4E 5F 4C 4F 4F 4B 45 52 53 D8 00 51 00");
 	if (save_weapon_gosub_place.size() == 1 && free_space_after_mission.size() == 1)
 	{
 		using namespace Memory;
@@ -1020,7 +1022,7 @@ static void AirRaidFix()
 static void QuadrupleStuntBonus()
 {
 	// IF HEIGHT_FLOAT_HJ > 4.0 -> IF HEIGHT_INT_HJ > 4
-	auto pattern = MakeScriptPattern(false, "20 00 02 60 14 06 00 00 80 40");
+	auto pattern = hook::pattern(MakeScriptScanSegment(false), "20 00 02 60 14 06 00 00 80 40");
 	if ( pattern.size() == 1 )
 	{
 		const uint8_t newCode[10] = {
@@ -6634,8 +6636,8 @@ void Patch_SA_10(HINSTANCE hInstance)
 			ReadCall(0x41BFA0, backToCruisingIfNoWantedLevel_Obfuscated);
 			if (ModCompat::Utils::GetModuleHandleFromAddress(backToCruisingIfNoWantedLevel_Obfuscated) == hInstance) try
 			{
-				auto joinCarWithRoadSystem = make_range_pattern(backToCruisingIfNoWantedLevel_Obfuscated, backToCruisingIfNoWantedLevel_Obfuscated + 0x100,
-					"56 E8 ? ? ? ? 8A 96 2D 04 00 00").get_first<void>(1);
+				auto joinCarWithRoadSystem = get_pattern({{ backToCruisingIfNoWantedLevel_Obfuscated, backToCruisingIfNoWantedLevel_Obfuscated + 0x100 }},
+					"56 E8 ? ? ? ? 8A 96 2D 04 00 00", 1);
 
 				VP::InterceptCall(joinCarWithRoadSystem, orgJoinCarWithRoadSystem, JoinCarWithRoadSystem_AbortDriveByTask);
 				HoodlumPatched = true;
@@ -6729,8 +6731,8 @@ void Patch_SA_10(HINSTANCE hInstance)
 			ReadCall(0x45CEA0, DealWithNewPedPacket_Obfuscated);
 			if (ModCompat::Utils::GetModuleHandleFromAddress(DealWithNewPedPacket_Obfuscated) == hInstance) try
 			{
-				auto DealWithNewPedPacket = make_range_pattern(DealWithNewPedPacket_Obfuscated, DealWithNewPedPacket_Obfuscated + 0x200,
-					"6A 01 56 E8 ? ? ? ? 83 C4 10").get_first<void>(3);
+				auto DealWithNewPedPacket = get_pattern({{ DealWithNewPedPacket_Obfuscated, DealWithNewPedPacket_Obfuscated + 0x200 }},
+					"6A 01 56 E8 ? ? ? ? 83 C4 10", 3);
 
 				VP::InterceptCall(DealWithNewPedPacket, orgRebuildPlayer, RebuildPlayer_LoadAllMotionGroupAnims);
 				HoodlumPatched = true;
