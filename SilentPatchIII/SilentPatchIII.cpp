@@ -2357,7 +2357,7 @@ void InjectDelayedPatches_III_Common( bool bHasDebugMenu, const wchar_t* wcModul
 
 void InjectDelayedPatches_III_Common()
 {
-	std::unique_ptr<ScopedUnprotect::Unprotect> Protect = ScopedUnprotect::UnprotectSectionOrFullModule( GetModuleHandle( nullptr ), ".text" );
+	auto Protect = ScopedUnprotect::SectionOrFullModule(GetModuleHandle(nullptr), ".text");
 
 	// Obtain a path to the ASI
 	wchar_t			wcModulePath[MAX_PATH];
@@ -3398,7 +3398,7 @@ BOOL WINAPI DllMain(HINSTANCE hinstDLL, DWORD fdwReason, LPVOID lpvReserved)
 
 		// This scope is mandatory so Protect goes out of scope before rwcseg gets fixed
 		{
-			std::unique_ptr<ScopedUnprotect::Unprotect> Protect = ScopedUnprotect::UnprotectSectionOrFullModule( GetModuleHandle( nullptr ), ".text" );
+			auto Protect = ScopedUnprotect::SectionOrFullModule(GetModuleHandle(nullptr), ".text");
 
 			const int8_t version = Memory::GetVersion().version;
 			if ( version == 0 ) Patch_III_10(width, height);

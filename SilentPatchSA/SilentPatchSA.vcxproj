@@ -241,8 +241,6 @@
     <ClInclude Include="..\SilentPatch\RWUtils.hpp" />
     <ClInclude Include="..\SilentPatch\SVF.h" />
     <ClInclude Include="..\SilentPatch\TheFLAUtils.h" />
-    <ClInclude Include="..\SilentPatch\Utils\DelimStringReader.h" />
-    <ClInclude Include="..\SilentPatch\Utils\MemoryMgr.GTA.h" />
     <ClInclude Include="..\SilentPatch\Utils\MemoryMgr.h" />
     <ClInclude Include="..\SilentPatch\Utils\Patterns.h" />
     <ClInclude Include="AnimationSA.h" />

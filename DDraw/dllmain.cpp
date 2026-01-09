@@ -39,7 +39,7 @@ void InjectHooks()
 	const auto [width, height] = GetDesktopResolution();
 	sprintf_s(aNoDesktopMode, "Cannot find %ux%ux32 video mode", width, height);
 
-	std::unique_ptr<ScopedUnprotect::Unprotect> Protect = ScopedUnprotect::UnprotectSectionOrFullModule( GetModuleHandle( nullptr ), ".text" );
+	auto Protect = ScopedUnprotect::SectionOrFullModule(GetModuleHandle(nullptr), ".text");
 
 	if (*(DWORD*)Memory::DynBaseAddress(0x5C1E75) == 0xB85548EC)
 	{

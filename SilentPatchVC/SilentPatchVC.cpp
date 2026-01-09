@@ -24,7 +24,7 @@
 #include "Utils/Patterns.h"
 #include "Utils/ScopedUnprotect.hpp"
 #include "Utils/HookEach.hpp"
-#include "Utils/DelimStringReader.h"
+#include "DelimStringReader.hpp"
 
 #include "debugmenu_public.h"
 
@@ -1528,7 +1528,7 @@ namespace SelectableBackfaceCulling
 		constexpr size_t SCRATCH_PAD_SIZE = 32767;
 		WideDelimStringReader reader(SCRATCH_PAD_SIZE);
 
-		GetPrivateProfileSectionW(L"DrawBackfaces", reader.GetBuffer(), reader.GetSize(), pPath);
+		GetPrivateProfileSectionW(L"DrawBackfaces", reader.PutBuffer(), reader.GetSize(), pPath);
 		while (const wchar_t* str = reader.GetString())
 		{
 			auto modelID = ParseUtils::TryParseInt(str);
@@ -1538,8 +1538,7 @@ namespace SelectableBackfaceCulling
 				SVF::RegisterFeature(ParseUtils::ParseString(str), SVF::Feature::DRAW_BACKFACES);
 		}
 
-		reader.Reset();
-		GetPrivateProfileSectionW(L"DontDrawBackfaces", reader.GetBuffer(), reader.GetSize(), pPath);
+		GetPrivateProfileSectionW(L"DontDrawBackfaces", reader.PutBuffer(), reader.GetSize(), pPath);
 		while (const wchar_t* str = reader.GetString())
 		{
 			auto modelID = ParseUtils::TryParseInt(str);
@@ -2599,7 +2598,7 @@ void InjectDelayedPatches_VC_Common( bool bHasDebugMenu, const wchar_t* wcModule
 
 void InjectDelayedPatches_VC_Common()
 {
-	std::unique_ptr<ScopedUnprotect::Unprotect> Protect = ScopedUnprotect::UnprotectSectionOrFullModule( GetModuleHandle( nullptr ), ".text" );
+	auto Protect = ScopedUnprotect::SectionOrFullModule(GetModuleHandle(nullptr), ".text");
 
 	// Obtain a path to the ASI
 	wchar_t			wcModulePath[MAX_PATH];
@@ -3628,7 +3627,7 @@ BOOL WINAPI DllMain(HINSTANCE hinstDLL, DWORD fdwReason, LPVOID lpvReserved)
 
 		// This scope is mandatory so Protect goes out of scope before rwcseg gets fixed
 		{
-			std::unique_ptr<ScopedUnprotect::Unprotect> Protect = ScopedUnprotect::UnprotectSectionOrFullModule( GetModuleHandle( nullptr ), ".text" );
+			auto Protect = ScopedUnprotect::SectionOrFullModule(GetModuleHandle(nullptr), ".text");
 
 			const int8_t version = Memory::GetVersion().version;
 			if ( version == 0 ) Patch_VC_10(width, height);

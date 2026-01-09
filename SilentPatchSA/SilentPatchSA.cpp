@@ -24,12 +24,12 @@
 #include "FLACDecoderSA.h"
 
 #include "Utils/Patterns.h"
-#include "Utils/DelimStringReader.h"
 #include "Utils/ModuleList.hpp"
 #include "Utils/ScopedUnprotect.hpp"
 #include "Utils/HookEach.hpp"
 
 #include "Desktop.h"
+#include "DelimStringReader.hpp"
 #include "FriendlyMonitorNames.h"
 #include "SVF.h"
 
@@ -3802,7 +3802,7 @@ namespace LSRPMode
 		constexpr size_t SCRATCH_PAD_SIZE = 32767;
 		WideDelimStringReader reader( SCRATCH_PAD_SIZE );
 
-		GetPrivateProfileSectionW( L"LSRPModeServers", reader.GetBuffer(), reader.GetSize(), pPath );
+		GetPrivateProfileSectionW( L"LSRPModeServers", reader.PutBuffer(), reader.GetSize(), pPath );
 		while ( const wchar_t* str = reader.GetString() )
 		{
 			int ip[4] = {};
@@ -4547,9 +4547,9 @@ BOOL InjectDelayedPatches_10()
 	{
 		using namespace Memory;
 
-		const HINSTANCE hInstance = GetModuleHandle( nullptr );
-		std::unique_ptr<ScopedUnprotect::Unprotect> Protect = ScopedUnprotect::UnprotectSectionOrFullModule( hInstance, ".text" );
-		ScopedUnprotect::Section Protect2( hInstance, ".rdata" );
+		const HINSTANCE hInstance = GetModuleHandle(nullptr);
+		auto Protect = ScopedUnprotect::SectionOrFullModule(hInstance, ".text");
+		auto Protect2 = ScopedUnprotect::Section(hInstance, ".rdata");
 
 		// Obtain a path to the ASI
 		wchar_t			wcModulePath[MAX_PATH];
@@ -5189,9 +5189,9 @@ BOOL InjectDelayedPatches_11()
 	if ( !IsAlreadyRunning() )
 	{
 		using namespace Memory;
-		const HINSTANCE hInstance = GetModuleHandle( nullptr );
-		std::unique_ptr<ScopedUnprotect::Unprotect> Protect = ScopedUnprotect::UnprotectSectionOrFullModule( hInstance, ".text" );
-		ScopedUnprotect::Section Protect2( hInstance, ".rdata" );
+		const HINSTANCE hInstance = GetModuleHandle(nullptr);
+		auto Protect = ScopedUnprotect::SectionOrFullModule(hInstance, ".text");
+		auto Protect2 = ScopedUnprotect::Section(hInstance, ".rdata");
 
 		// Obtain a path to the ASI
 		wchar_t			wcModulePath[MAX_PATH];
@@ -5381,9 +5381,9 @@ BOOL InjectDelayedPatches_Steam()
 	if ( !IsAlreadyRunning() )
 	{
 		using namespace Memory;
-		const HINSTANCE hInstance = GetModuleHandle( nullptr );
-		std::unique_ptr<ScopedUnprotect::Unprotect> Protect = ScopedUnprotect::UnprotectSectionOrFullModule( hInstance, ".text" );
-		ScopedUnprotect::Section Protect2( hInstance, ".rdata" );
+		const HINSTANCE hInstance = GetModuleHandle(nullptr);
+		auto Protect = ScopedUnprotect::SectionOrFullModule(hInstance, ".text");
+		auto Protect2 = ScopedUnprotect::Section(hInstance, ".rdata");
 
 		// Obtain a path to the ASI
 		wchar_t			wcModulePath[MAX_PATH];
@@ -5562,9 +5562,9 @@ BOOL InjectDelayedPatches_NewBinaries()
 		using namespace Memory;
 		using namespace hook::txn;
 
-		const HINSTANCE hInstance = GetModuleHandle( nullptr );
-		std::unique_ptr<ScopedUnprotect::Unprotect> Protect = ScopedUnprotect::UnprotectSectionOrFullModule( hInstance, ".text" );
-		ScopedUnprotect::Section Protect2( hInstance, ".rdata" );
+		const HINSTANCE hInstance = GetModuleHandle(nullptr);
+		auto Protect = ScopedUnprotect::SectionOrFullModule(hInstance, ".text");
+		auto Protect2 = ScopedUnprotect::Section(hInstance, ".rdata");
 
 		// Obtain a path to the ASI
 		wchar_t			wcModulePath[MAX_PATH];
@@ -9458,9 +9458,9 @@ BOOL WINAPI DllMain(HINSTANCE hinstDLL, DWORD fdwReason, LPVOID lpvReserved)
 
 	if ( fdwReason == DLL_PROCESS_ATTACH )
 	{
-		const HINSTANCE hInstance = GetModuleHandle( nullptr );
-		std::unique_ptr<ScopedUnprotect::Unprotect> Protect = ScopedUnprotect::UnprotectSectionOrFullModule( hInstance, ".text" );
-		ScopedUnprotect::Section Protect2( hInstance, ".rdata" );
+		const HINSTANCE hInstance = GetModuleHandle(nullptr);
+		auto Protect = ScopedUnprotect::SectionOrFullModule(hInstance, ".text");
+		auto Protect2 = ScopedUnprotect::Section(hInstance, ".rdata");
 
 		const int8_t version = Memory::GetVersion().version;
 		if ( version == 0 ) Patch_SA_10(hInstance);

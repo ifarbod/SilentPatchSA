@@ -140,12 +140,6 @@
     <ClInclude Include="FireManagerSA.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="..\SilentPatch\Utils\DelimStringReader.h">
-      <Filter>Header Files\Utils</Filter>
-    </ClInclude>
-    <ClInclude Include="..\SilentPatch\Utils\MemoryMgr.GTA.h">
-      <Filter>Header Files\Utils</Filter>
-    </ClInclude>
     <ClInclude Include="..\SilentPatch\Utils\MemoryMgr.h">
       <Filter>Header Files\Utils</Filter>
     </ClInclude>

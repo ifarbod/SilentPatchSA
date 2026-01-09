@@ -9,7 +9,7 @@
 #include "Random.h"
 #include "RWGTA.h"
 
-#include "Utils/DelimStringReader.h"
+#include "DelimStringReader.hpp"
 
 #include <array>
 
@@ -136,7 +136,7 @@ namespace ExtraCompSpecularity
 		constexpr size_t SCRATCH_PAD_SIZE = 32767;
 		WideDelimStringReader reader(SCRATCH_PAD_SIZE);
 
-		GetPrivateProfileSectionW(L"ExtraCompSpecularityExceptions", reader.GetBuffer(), reader.GetSize(), pPath);
+		GetPrivateProfileSectionW(L"ExtraCompSpecularityExceptions", reader.PutBuffer(), reader.GetSize(), pPath);
 		while (const wchar_t* str = reader.GetString())
 		{
 			auto modelID = ParseUtils::TryParseInt(str);

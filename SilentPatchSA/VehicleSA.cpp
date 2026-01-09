@@ -4,7 +4,7 @@
 #include "VehicleSA.h"
 #include "TimerSA.h"
 #include "PedSA.h"
-#include "Utils/DelimStringReader.h"
+#include "DelimStringReader.hpp"
 #include "PlayerInfoSA.h"
 #include "ParseUtils.hpp"
 #include "Random.h"
@@ -26,7 +26,7 @@ bool ReadDoubleRearWheels(const wchar_t* pPath)
 	constexpr size_t SCRATCH_PAD_SIZE = 32767;
 	WideDelimStringReader reader( SCRATCH_PAD_SIZE );
 
-	GetPrivateProfileSectionW( L"DoubleRearWheels", reader.GetBuffer(), reader.GetSize(), pPath );
+	GetPrivateProfileSectionW( L"DoubleRearWheels", reader.PutBuffer(), reader.GetSize(), pPath );
 	while ( const wchar_t* str = reader.GetString() )
 	{
 		wchar_t textLine[128];
@@ -204,7 +204,7 @@ void ReadRotorFixExceptions(const wchar_t* pPath)
 	constexpr size_t SCRATCH_PAD_SIZE = 32767;
 	WideDelimStringReader reader( SCRATCH_PAD_SIZE );
 
-	GetPrivateProfileSectionW( L"RotorFixExceptions", reader.GetBuffer(), reader.GetSize(), pPath );
+	GetPrivateProfileSectionW( L"RotorFixExceptions", reader.PutBuffer(), reader.GetSize(), pPath );
 	while ( const wchar_t* str = reader.GetString() )
 	{
 		auto ID = ParseUtils::TryParseInt(str);
@@ -220,7 +220,7 @@ void ReadLightbeamFixExceptions(const wchar_t* pPath)
 	constexpr size_t SCRATCH_PAD_SIZE = 32767;
 	WideDelimStringReader reader( SCRATCH_PAD_SIZE );
 
-	GetPrivateProfileSectionW( L"LightbeamFixExceptions", reader.GetBuffer(), reader.GetSize(), pPath );
+	GetPrivateProfileSectionW( L"LightbeamFixExceptions", reader.PutBuffer(), reader.GetSize(), pPath );
 	while ( const wchar_t* str = reader.GetString() )
 	{
 		auto ID = ParseUtils::TryParseInt(str);
