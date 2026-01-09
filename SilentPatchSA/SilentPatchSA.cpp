@@ -3805,16 +3805,14 @@ namespace LSRPMode
 		GetPrivateProfileSectionW( L"LSRPModeServers", reader.PutBuffer(), reader.GetSize(), pPath );
 		while ( const wchar_t* str = reader.GetString() )
 		{
-			int ip[4] = {};
+			int ip[4];
 			int port = 0;
 
 			// IP is mandatory, port is optional
-			int argsRead = swscanf_s( str, L"%d.%d.%d.%d", &ip[0], &ip[1], &ip[2], &ip[3] );
-			if ( argsRead == 4 )
+			const int argsRead = swscanf_s(str, L"%d.%d.%d.%d:%d", &ip[0], &ip[1], &ip[2], &ip[3], &port);
+			if (argsRead >= 4)
 			{
-				swscanf_s( str, L"%*d.%*d.%*d.%*d:%d", &port );
-
-				IPv4 myIP = {};
+				IPv4 myIP;
 				bool validIP = true;
 
 				for ( size_t i = 0; i < 4; i++ )
