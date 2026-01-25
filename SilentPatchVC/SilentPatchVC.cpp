@@ -1784,16 +1784,6 @@ namespace ModelIndicesReadyHook
 		orgInitialiseObjectData(path);
 		SVF::MarkModelNamesReady();
 		ConstructionSiteLODFix::MatchModelIndices();
-
-		// This is a bit dirty, but whatever
-		// Tooled Up in North Point Mall needs a "draw last" flag, or else our BFC changes break it very badly
-		// AmmuNation and other stores already have that flag, this one does not
-		void* model = GetModelInfo("mall_hardware", nullptr);
-		if (model != nullptr)
-		{
-			uint16_t* flags = reinterpret_cast<uint16_t*>(static_cast<char*>(model) + 0x42);
-			*flags |= 0x40;
-		}
 	}
 }
 
