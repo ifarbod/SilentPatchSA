@@ -7064,6 +7064,11 @@ void Patch_SA_10(HINSTANCE hInstance)
 		using namespace AdvancedDisplaySettingsCrashFix;
 		InterceptCall(0x57A071, orgAsciiToGxtChar, AsciiToGxtChar_NullCheck);
 	}
+
+
+	// Fix 2 player blips both drawing in P1's position
+	// nop \ push esi
+	Patch(0x588581, { 0x90, 0x56 });
 }
 
 void Patch_SA_11()
@@ -9445,6 +9450,17 @@ void Patch_SA_NewBinaries_Common(HINSTANCE hInstance)
 
 		auto ascii_to_gxt_char = get_pattern("E8 ? ? ? ? 33 C0 83 C4 08 38 85");
 		InterceptCall(ascii_to_gxt_char, orgAsciiToGxtChar, AsciiToGxtChar_NullCheck);
+	}
+	TXN_CATCH();
+
+
+	// Fix 2 player blips both drawing in P1's position
+	try
+	{
+		auto find_player_centre_of_world = get_pattern("6A 00 52 E8 ? ? ? ? D9 45 84");
+
+		// nop \ push esi
+		Patch(find_player_centre_of_world, { 0x90, 0x56 });
 	}
 	TXN_CATCH();
 }
