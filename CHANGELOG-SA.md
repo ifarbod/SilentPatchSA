@@ -117,6 +117,8 @@ All the remaining, non-critical fixes.
 * ➕ Specific roadblocks in 'End of the Line' will no longer spawn CJ's clones.
 * ➕ Additional gang tags added through mods can now load from the save file correctly.
 * ➕ Fixed a broken CREATE_BIRDS script command. This fixes birds not spawning during the skylight cutscene in "Ice Cold Killa".
+* ➕ Second player's blip now displays in the correct position on the map.
+* ➕ Gang wars no longer remove map blips of the player's gang.
 * Detached vehicle parts will now keep the same color and lighting as the vehicle they came from.
 * Detached vehicle parts are now rendered from both sides.
 * Resolved single-pixel wide seams showing on the Map screen with Anti-Aliasing enabled.
