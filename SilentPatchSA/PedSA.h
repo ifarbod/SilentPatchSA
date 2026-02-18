@@ -381,7 +381,7 @@ public:
 	uint8_t				GetWeaponSkill();
 	void				ResetGunFlashAlpha();
 	void				SetGunFlashAlpha(bool bSecondWeapon);
-	void				Say(uint16_t phrase, uint32_t param2 = 0, float volume = 1.0f, bool param4 = false, bool param5 = false, bool param6 = false);
+	int16_t				Say(uint16_t phrase, uint32_t param2 = 0, float volume = 1.0f, bool param4 = false, bool param5 = false, bool param6 = false);
 
 	void				RenderWeapon(bool bWeapon, bool bMuzzleFlash, bool bForShadow);
 	void				RenderForShadow();
@@ -398,14 +398,15 @@ public:
 
 	uint8_t				GetWeaponSkillForRenderWeaponPedsForPC_SAMP();
 
-	static inline void (CPed::*orgSay)(uint16_t phrase, uint32_t param2, float volume, bool param4, bool param5, bool param6);
+	static inline int16_t (CPed::*orgSay)(uint16_t phrase, void* param2, void* volume, void* param4, void* param5, void* param6);
 	template<uint16_t blackSample>
-	void				Say_SampleBlackList(uint16_t phrase, uint32_t param2 = 0, float volume = 1.0f, bool param4 = false, bool param5 = false, bool param6 = false)
+	int16_t				Say_SampleBlackList(uint16_t phrase, void* param2, void* volume, void* param4, void* param5, void* param6)
 	{
 		if ( !(phrase == blackSample) )
 		{
-			std::invoke(orgSay, this, phrase, param2, volume, param4, param5, param6);
+			return std::invoke(orgSay, this, phrase, param2, volume, param4, param5, param6);
 		}
+		return -1;
 	}
 };
 
