@@ -3736,6 +3736,57 @@ namespace TimecycDatMissingDataFix
 }
 
 
+// ============= Speech system fixes =============
+namespace SpeechSystemFixes
+{
+	static uint32_t* ConversationTopic;
+
+	static void* (__thiscall* orgPedSay)(void* ped, uint16_t Phrase, void* StartTimeDelay, void* Probability, void* bOverideSilence, void* bForceAudible, void* bFrontEnd);
+	static void* __fastcall PedSay_NegativeWeatherOverride(void* ped, void*, uint16_t Phrase, void* StartTimeDelay, void* Probability, void* bOverideSilence, void* bForceAudible, void* bFrontEnd)
+	{
+		// Positive replies to a negative weather comment need special casing
+		if ((Phrase == 0x83 || Phrase == 0x84) && *ConversationTopic == 7) // (LIKE_DISMISS_FEMALE || LIKE_DISMISS_MALE) && CONV_WEATHER
+		{
+			Phrase = 0xE9; // WEATHER_DISL_REPLY
+		}
+		return orgPedSay(ped, Phrase, StartTimeDelay, Probability, bOverideSilence, bForceAudible, bFrontEnd);
+	}
+
+	static bool bShouldOverrideWellDressedMood = false;
+	static int16_t (*orgGetCurrentCJMood)();
+	static int16_t GetCurrentCJMood_Override()
+	{
+		return bShouldOverrideWellDressedMood ? 2 : orgGetCurrentCJMood(); // Force MOOD_CD
+	}
+
+	static int16_t GetSoundAndBankIDs_WeatherReplyFallback_Internal(int16_t (__thiscall* func)(CAEPedSpeechAudioEntity* obj, int16_t GlobalSpeechContext, void* a2),
+					CAEPedSpeechAudioEntity* obj, int16_t GlobalSpeechContext, void* a2)
+	{
+		int16_t result = func(obj, GlobalSpeechContext, a2);
+
+		// Fallback for player's weather replies - force a CD mood, since only CD and CF moods have responses, and since we cannot update
+		// the speech lookup tables to reference samples across different moods, we need to fake the CD mood for the call.
+		if (result < 0 && obj->m_PedType == 2 && (GlobalSpeechContext == 0xE9 || GlobalSpeechContext == 0xEA)) // PED_TYPE_PLAYER, (WEATHER_DISL_REPLY || WEATHER_LIKE_REPLY)
+		{
+			bShouldOverrideWellDressedMood = true;
+			result = func(obj, GlobalSpeechContext, a2);
+			bShouldOverrideWellDressedMood = false;
+		}
+		return result;
+	}
+
+	template<std::size_t Index>
+	static int16_t (__thiscall* orgGetSoundAndBankIDs)(CAEPedSpeechAudioEntity* obj, int16_t GlobalSpeechContext, void* a2);
+	template<std::size_t Index>
+	static int16_t __fastcall GetSoundAndBankIDs_WeatherReplyFallback(CAEPedSpeechAudioEntity* obj, void*, int16_t GlobalSpeechContext, void* a2)
+	{
+		return GetSoundAndBankIDs_WeatherReplyFallback_Internal(orgGetSoundAndBankIDs<Index>, obj, GlobalSpeechContext, a2);
+	}
+
+	HOOK_EACH_INIT(GetSoundAndBankIDs, orgGetSoundAndBankIDs, GetSoundAndBankIDs_WeatherReplyFallback);
+}
+
+
 // ============= LS-RP Mode stuff =============
 namespace LSRPMode
 {
@@ -7076,6 +7127,24 @@ void Patch_SA_10(HINSTANCE hInstance)
 	Patch<int8_t>(0x446A20 + 1, 0);
 	Patch<int8_t>(0x446B93 + 1, 0);
 	Patch<int8_t>(0x446C2C + 1, 0);
+
+
+	// Speech system fixes
+	{
+		using namespace SpeechSystemFixes;
+
+		ConversationTopic = *(uint32_t**)(0x43BE8A + 1);
+
+		Patch<int8_t>(0x43B341 + 1, 8); // Let AE_CONV_WEATHER be picked by peds
+		InterceptCall(0x43BE4A, orgPedSay, PedSay_NegativeWeatherOverride); // Add a special case for a positive reply to a negative weather comment
+
+		// Special case CJ's weather responses to fall back to the CD mood instead of CR
+		std::array<intptr_t, 1> get_sound_and_bank_ids = {
+			0x4E67E2
+		};
+		HookEach_GetSoundAndBankIDs(get_sound_and_bank_ids, InterceptCall);
+		InterceptCall(0x4E5A67, orgGetCurrentCJMood, GetCurrentCJMood_Override);
+	}
 }
 
 void Patch_SA_11()
@@ -9484,6 +9553,40 @@ void Patch_SA_NewBinaries_Common(HINSTANCE hInstance)
 		Patch<int8_t>(update1, 0);
 		Patch<int8_t>(update2, 0);
 		Patch<int8_t>(update3, 0);
+	}
+	TXN_CATCH();
+
+
+	// Speech system fixes
+	try
+	{
+		using namespace SpeechSystemFixes;
+
+		// All those fixes can live separately, so they are in separate blocks
+		try
+		{
+			auto get_conversation_topic_upper = get_pattern("6A 07 6A 00 EB 04", 1);
+			Patch<int8_t>(get_conversation_topic_upper, 8); // Let AE_CONV_WEATHER be picked by peds
+		}
+		TXN_CATCH();
+
+		try
+		{
+			auto ped_say_negative_weather_override = get_pattern("E8 ? ? ? ? 8B 0D ? ? ? ? 89 3D");
+			ConversationTopic = *get_pattern<uint32_t*>("A1 ? ? ? ? 83 E8 08", 1);
+
+			InterceptCall(ped_say_negative_weather_override, orgPedSay, PedSay_NegativeWeatherOverride); // Add a special case for a positive reply to a negative weather comment
+		}
+		TXN_CATCH();
+
+		// Special case CJ's weather responses to fall back to the CD mood instead of CR
+		auto current_mood_override = get_pattern("E8 ? ? ? ? 0F B7 D8 53 8B CF");
+
+		std::array<void*, 1> get_sound_and_bank_ids = {
+			get_pattern("E8 ? ? ? ? 0F B7 C0 89 45 0C 66 85 C0"),
+		};
+		HookEach_GetSoundAndBankIDs(get_sound_and_bank_ids, InterceptCall);
+		InterceptCall(current_mood_override, orgGetCurrentCJMood, GetCurrentCJMood_Override);
 	}
 	TXN_CATCH();
 }

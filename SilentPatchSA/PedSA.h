@@ -1,5 +1,4 @@
-#ifndef __PEDSA
-#define __PEDSA
+#pragma once
 
 #include "GeneralSA.h"
 
@@ -436,5 +435,9 @@ public:
 	static void (*RebuildPlayer)(CPlayerPed* ped, bool bForReplay);
 };
 
-
-#endif
+class CAEPedSpeechAudioEntity
+{
+public:
+	std::byte	_pad[0x92];
+	int16_t		m_PedType;
+};
