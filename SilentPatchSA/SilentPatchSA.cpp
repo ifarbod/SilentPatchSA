@@ -1702,12 +1702,10 @@ static void CdStreamInitThread()
 }
 
 // Dancing timers fix
-static long UtilsVariablesInit = 0;
 static LARGE_INTEGER UtilsStartTime;
 static LARGE_INTEGER UtilsFrequency;
 static BOOL WINAPI AudioUtilsFrequency( PLARGE_INTEGER lpFrequency )
 {
-	::QueryPerformanceFrequency( &UtilsFrequency );
 	lpFrequency->QuadPart = UtilsFrequency.QuadPart;
 	return TRUE;
 }
@@ -1716,18 +1714,11 @@ static auto* const pAudioUtilsFrequency = &AudioUtilsFrequency;
 static int64_t AudioUtilsGetStartTime()
 {
 	QueryPerformanceCounter( &UtilsStartTime );
-
-	_InterlockedExchange( &UtilsVariablesInit, 1 );
 	return UtilsStartTime.QuadPart;
 }
 
 static int64_t AudioUtilsGetCurrentTimeInMs()
 {
-	if ( _InterlockedCompareExchange( &UtilsVariablesInit, 0, 0 ) == 0 )
-	{
-		return 0;
-	}
-
 	LARGE_INTEGER currentTime;
 	QueryPerformanceCounter( &currentTime );
 	return ((currentTime.QuadPart - UtilsStartTime.QuadPart) * 1000) / UtilsFrequency.QuadPart;
@@ -6389,10 +6380,14 @@ void Patch_SA_10(HINSTANCE hInstance)
 
 	// Fixed CAEAudioUtility timers - not typecasting to float so we're not losing precision after X days of PC uptime
 	// Also fixed integer division by zero
-	Patch( 0x5B9868 + 2, &pAudioUtilsFrequency );
-	InjectHook( 0x5B9886, AudioUtilsGetStartTime );
-	InjectHook( 0x4D9E80, AudioUtilsGetCurrentTimeInMs, HookType::Jump );
+	{
+		::QueryPerformanceFrequency( &UtilsFrequency );
+		::QueryPerformanceCounter( &UtilsStartTime );
 
+		Patch( 0x5B9868 + 2, &pAudioUtilsFrequency );
+		InjectHook( 0x5B9886, AudioUtilsGetStartTime );
+		InjectHook( 0x4D9E80, AudioUtilsGetCurrentTimeInMs, HookType::Jump );
+	}
 
 	// Car generators placed in interiors visible everywhere
 	InjectHook( 0x6F3B30, &CEntity::SetPositionAndAreaCode );
@@ -8582,10 +8577,14 @@ void Patch_SA_NewBinaries_Common(HINSTANCE hInstance)
 	try
 	{
 		auto staticInitialize = pattern( "FF 15 ? ? ? ? 5F 5E 85 C0" ).get_one();
+		auto get_current_time = get_pattern( "50 FF 15 ? ? ? ? DF 6D F8", -9 );
+
+		::QueryPerformanceFrequency( &UtilsFrequency );
+		::QueryPerformanceCounter( &UtilsStartTime );
 
 		Patch( staticInitialize.get<void>( 2 ), &pAudioUtilsFrequency );
 		InjectHook( staticInitialize.get<void>( 0x1E ), AudioUtilsGetStartTime );
-		InjectHook( get_pattern( "50 FF 15 ? ? ? ? DF 6D F8", -9 ), AudioUtilsGetCurrentTimeInMs, HookType::Jump );
+		InjectHook( get_current_time, AudioUtilsGetCurrentTimeInMs, HookType::Jump );
 	}
 	TXN_CATCH();
 
