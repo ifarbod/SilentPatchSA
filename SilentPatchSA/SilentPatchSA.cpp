@@ -1898,8 +1898,8 @@ namespace FirelaHook
 namespace HierarchyTypoFix
 {
 	// Allow wheel_lm vs wheel_lm_dummy and miscX vs misc_X typos
-	// Must be sorted by second parameter
-	constexpr std::pair<const char*, const char*> typosAndFixes[] = {
+	// Must be sorted by the second parameter
+	static constexpr std::pair<const char*, const char*> typosAndFixes[] = {
 		{ "boat_moving_hi", "boat_moving" },
 		{ "elevator_r", "elevator" },
 		{ "misc_a", "misca" },
@@ -3775,6 +3775,40 @@ namespace SpeechSystemFixes
 	}
 
 	HOOK_EACH_INIT(GetSoundAndBankIDs, orgGetSoundAndBankIDs, GetSoundAndBankIDs_WeatherReplyFallback);
+
+	static int16_t GetVoice_CheckTypos_Internal(int16_t (*func)(const char* pString, void* type), const char* pString, void* type)
+	{
+		int16_t result = func(pString, type);
+		if (result < 0 && strcmp(pString, "0") != 0)
+		{
+			// Must be sorted by the second parameter
+			static constexpr std::pair<const char*, const char*> typosAndFixes[] = {
+				{ "VOICE_GEN_BYMPI", "VOICE_GEN_BMYPI" },
+				{ "VOICE_GEN_WMYSGRD", "VOICE_GEN_WMYSGRAD" },
+			};
+
+			for (const auto& typo : typosAndFixes)
+			{
+				const int comp = strcmp(typo.second, pString);
+				if (comp == 0)
+				{
+					return func(typo.first, type);
+				}
+				if (comp > 0) break;
+			}
+		}
+		return result;
+	}
+
+	template<std::size_t Index>
+	static int16_t (*orgGetVoice)(const char* pString, void* type);
+	template<std::size_t Index>
+	static int16_t GetVoice_CheckTypos(const char* pString, void* type)
+	{
+		return GetVoice_CheckTypos_Internal(orgGetVoice<Index>, pString, type);
+	}
+
+	HOOK_EACH_INIT(GetVoice, orgGetVoice, GetVoice_CheckTypos);
 }
 
 
@@ -7141,6 +7175,12 @@ void Patch_SA_10(HINSTANCE hInstance)
 		InterceptCall(0x4E5A67, orgGetCurrentCJMood, GetCurrentCJMood_Override);
 
 		Patch<uint8_t>(0x4B9BB9 + 1, 0); // Stop criminals screaming when they run away from cops
+
+		// Account for typos in voices of WMYSGRD and BMYPIMP
+		std::array<intptr_t, 2> get_voices = {
+			0x5B75AB, 0x5B75BD
+		};
+		HookEach_GetVoice(get_voices, InterceptCall);
 	}
 }
 
@@ -9597,6 +9637,19 @@ void Patch_SA_NewBinaries_Common(HINSTANCE hInstance)
 		{
 			auto scream_flag = get_pattern("6A FF 51 D9 1C 24 6A 01", 6 + 1);
 			Patch<uint8_t>(scream_flag, 0); // Stop criminals screaming when they run away from cops
+		}
+		TXN_CATCH();
+
+		try
+		{
+			// Account for typos in voices of WMYSGRD and BMYPIMP
+			auto get_voices_pattern = pattern("E8 ? ? ? ? 8D 95 ? ? ? ? 57 52 66 89 46 3E E8").get_one();
+
+			std::array<void*, 2> get_voices = {
+				get_voices_pattern.get<void>(),
+				get_voices_pattern.get<void>(0x11),
+			};
+			HookEach_GetVoice(get_voices, InterceptCall);
 		}
 		TXN_CATCH();
 	}
