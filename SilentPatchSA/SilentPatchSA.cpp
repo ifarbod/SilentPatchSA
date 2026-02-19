@@ -7139,6 +7139,8 @@ void Patch_SA_10(HINSTANCE hInstance)
 		};
 		HookEach_GetSoundAndBankIDs(get_sound_and_bank_ids, InterceptCall);
 		InterceptCall(0x4E5A67, orgGetCurrentCJMood, GetCurrentCJMood_Override);
+
+		Patch<uint8_t>(0x4B9BB9 + 1, 0); // Stop criminals screaming when they run away from cops
 	}
 }
 
@@ -9578,14 +9580,25 @@ void Patch_SA_NewBinaries_Common(HINSTANCE hInstance)
 		}
 		TXN_CATCH();
 
-		// Special case CJ's weather responses to fall back to the CD mood instead of CR
-		auto current_mood_override = get_pattern("E8 ? ? ? ? 0F B7 D8 53 8B CF");
+		try
+		{
+			// Special case CJ's weather responses to fall back to the CD mood instead of CR
+			auto current_mood_override = get_pattern("E8 ? ? ? ? 0F B7 D8 53 8B CF");
 
-		std::array<void*, 1> get_sound_and_bank_ids = {
-			get_pattern("E8 ? ? ? ? 0F B7 C0 89 45 0C 66 85 C0"),
-		};
-		HookEach_GetSoundAndBankIDs(get_sound_and_bank_ids, InterceptCall);
-		InterceptCall(current_mood_override, orgGetCurrentCJMood, GetCurrentCJMood_Override);
+			std::array<void*, 1> get_sound_and_bank_ids = {
+				get_pattern("E8 ? ? ? ? 0F B7 C0 89 45 0C 66 85 C0"),
+			};
+			HookEach_GetSoundAndBankIDs(get_sound_and_bank_ids, InterceptCall);
+			InterceptCall(current_mood_override, orgGetCurrentCJMood, GetCurrentCJMood_Override);
+		}
+		TXN_CATCH();
+
+		try
+		{
+			auto scream_flag = get_pattern("6A FF 51 D9 1C 24 6A 01", 6 + 1);
+			Patch<uint8_t>(scream_flag, 0); // Stop criminals screaming when they run away from cops
+		}
+		TXN_CATCH();
 	}
 	TXN_CATCH();
 }
