@@ -122,6 +122,7 @@ All the remaining, non-critical fixes.
 * ➕ Pedestrians can now initiate conversations about the weather, and CJ can respond to their comments correctly.
 * ➕ Criminals running away from cops will now play their correct dialogue lines instead of screaming (contributed by **iFarbod**).
 * ➕ WMYSGRD and BMYPIMP now have the correct voices.
+* ➕ CJ now cheers after taking over certain districts.
 * Detached vehicle parts will now keep the same color and lighting as the vehicle they came from.
 * Detached vehicle parts are now rendered from both sides.
 * Resolved single-pixel wide seams showing on the Map screen with Anti-Aliasing enabled.
