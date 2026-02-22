@@ -3887,6 +3887,32 @@ namespace SpeechSystemFixes
 	}
 
 	HOOK_EACH_INIT(TextLabelStricmp, orgStricmp, stricmp_UseTextLabel);
+
+
+	static void (*orgSetCJMood)(void*, void*, void*, void*, void*);
+	// Those are not actually void*, but we just need to store these arguments for later,
+	// regardless of what they contain
+	static void* nBasicMood_Stored;
+	static void* nTimeInMilliseconds_Stored;
+	static void* nGangBanging_Stored;
+	static void* nFat_Stored;
+	static void* nWellDressed_Stored;
+	static void SetCJMood_Store(void* nBasicMood, void* nTimeInMilliseconds, void* nGangBanging, void* nFat, void* nWellDressed)
+	{
+		nBasicMood_Stored = nBasicMood;
+		nTimeInMilliseconds_Stored = nTimeInMilliseconds;
+		nGangBanging_Stored = nGangBanging;
+		nFat_Stored = nFat;
+		nWellDressed_Stored = nWellDressed;
+	}
+	static void* (__thiscall* orgPedSay_Solicit)(void* ped, void* Phrase, void* StartTimeDelay, void* Probability, void* bOverideSilence, void* bForceAudible, void* bFrontEnd);
+	static void* __fastcall PedSay_Solicit_ChangeMood(void* ped, void*, void* Phrase, void* StartTimeDelay, void* Probability, void* bOverideSilence, void* bForceAudible, void* bFrontEnd)
+	{
+		void* result = orgPedSay_Solicit(ped, Phrase, StartTimeDelay, Probability, bOverideSilence, bForceAudible, bFrontEnd);
+		orgSetCJMood(nBasicMood_Stored, nTimeInMilliseconds_Stored, nGangBanging_Stored, nFat_Stored, nWellDressed_Stored);
+		return result;
+	}
+
 }
 
 
@@ -7351,6 +7377,10 @@ void Patch_SA_10(HINSTANCE hInstance)
 			0x444211, 0x444241, 0x444272, 0x4442A3
 		};
 		HookEach_TextLabelStricmp(stricmp_calls, InterceptCall);
+
+		// Change CJ's mood to WR after playing the solicit line, not before, so non-WR lines end up getting used
+		InterceptCall(0x666A82, orgSetCJMood, SetCJMood_Store);
+		InterceptCall(0x666A9C, orgPedSay_Solicit, PedSay_Solicit_ChangeMood);
 	}
 }
 
@@ -9851,6 +9881,16 @@ void Patch_SA_NewBinaries_Common(HINSTANCE hInstance)
 				cheer_victory_stricmp3.get(2).get<void>(11), cheer_victory_stricmp3.get(3).get<void>(11),
 			};
 			HookEach_TextLabelStricmp(stricmp_calls, InterceptCall);
+		}
+		TXN_CATCH();
+
+		// Change CJ's mood to WR after playing the solicit line, not before, so non-WR lines end up getting used
+		try
+		{
+			auto task_solicit = pattern("E8 ? ? ? ? D9 E8 83 C4 14 6A 00 6A 00 6A 00 51 8B 4E 0C D9 1C 24 6A 00 6A 0B E8").get_one();
+
+			InterceptCall(task_solicit.get<void>(0), orgSetCJMood, SetCJMood_Store);
+			InterceptCall(task_solicit.get<void>(0x1B), orgPedSay_Solicit, PedSay_Solicit_ChangeMood);
 		}
 		TXN_CATCH();
 	}

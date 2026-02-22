@@ -123,6 +123,7 @@ All the remaining, non-critical fixes.
 * ➕ Criminals running away from cops will now play their correct dialogue lines instead of screaming (contributed by **iFarbod**).
 * ➕ WMYSGRD and BMYPIMP now have the correct voices.
 * ➕ CJ now cheers after taking over certain districts.
+* ➕ CJ's comments after the solicitation are no longer forced to the Wisecracking mood, so their variety is wider.
 * Detached vehicle parts will now keep the same color and lighting as the vehicle they came from.
 * Detached vehicle parts are now rendered from both sides.
 * Resolved single-pixel wide seams showing on the Map screen with Anti-Aliasing enabled.
