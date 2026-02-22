@@ -7255,6 +7255,9 @@ void Patch_SA_10(HINSTANCE hInstance)
 	Patch<int8_t>(0x61E52E + 2, 0x11); // PED_TYPE_DEALER
 	Patch<int8_t>(0x61E533 + 2, 0x14); // PED_TYPE_CRIMINAL
 
+	Patch<int8_t>(0x625434 + 2, 0x11); // PED_TYPE_DEALER
+	Patch<int8_t>(0x625439 + 2, 0x14); // PED_TYPE_CRIMINAL
+
 
 	// Fix CJ clones spawning in gang roadblocks in neutral zones
 	Patch(0x4613C2, { 0x39, 0x5C }); // cmp X, ebx
@@ -9656,6 +9659,11 @@ void Patch_SA_NewBinaries_Common(HINSTANCE hInstance)
 
 		Patch<int8_t>(set_move_anim.get<void>(2), 0x11); // PED_TYPE_DEALER
 		Patch<int8_t>(set_move_anim.get<void>(5 + 2), 0x14); // PED_TYPE_CRIMINAL
+
+		auto set_move_anim_gun_control = pattern("83 F8 0F 7E 2B 83 F8 06 75 72").get_one();
+
+		Patch<int8_t>(set_move_anim_gun_control.get<void>(2), 0x11); // PED_TYPE_DEALER
+		Patch<int8_t>(set_move_anim_gun_control.get<void>(5 + 2), 0x14); // PED_TYPE_CRIMINAL
 	}
 	TXN_CATCH();
 
