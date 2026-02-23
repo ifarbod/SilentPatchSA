@@ -173,6 +173,9 @@
     <ClInclude Include="AnimationSA.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="SpeechContextsSA.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <Image Include="lunar64.png">

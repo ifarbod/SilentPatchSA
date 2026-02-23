@@ -410,8 +410,6 @@ public:
 	}
 };
 
-constexpr uint16_t CONTEXT_GLOBAL_CAR_HIT_PED = 36; // CPed::Say enum
-
 class NOVMT CPlayerPed : public CPed
 {
 private:

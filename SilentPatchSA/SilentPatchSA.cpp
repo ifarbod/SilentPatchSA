@@ -18,6 +18,7 @@
 #include "PNGFile.h"
 #include "PlayerInfoSA.h"
 #include "FireManagerSA.h"
+#include "SpeechContextsSA.h"
 #include "Random.h"
 
 #include "WaveDecoderSA.h"
@@ -3730,83 +3731,15 @@ namespace TimecycDatMissingDataFix
 // ============= Speech system fixes =============
 namespace SpeechSystemFixes
 {
-	enum
-	{
-		PED_TYPE_GEN = 0,
-		PED_TYPE_EMG,
-		PED_TYPE_PLAYER,
-		PED_TYPE_GANG,
-		PED_TYPE_GIRLFRIEND,
-		PED_TYPE_SPECIAL,
-		PED_TYPE_END
-	};
-
-	enum GlobalSpeechContexts
-	{
-		CONTEXT_GLOBAL_TAKE_TURF_LAS_COLINAS = 208,
-		CONTEXT_GLOBAL_TAKE_TURF_LOS_FLORES,
-		CONTEXT_GLOBAL_TAKE_TURF_EAST_BEACH,
-		CONTEXT_GLOBAL_TAKE_TURF_EAST_LS,
-		CONTEXT_GLOBAL_TAKE_TURF_JEFFERSON,
-		CONTEXT_GLOBAL_TAKE_TURF_GLEN_PARK,
-		CONTEXT_GLOBAL_TAKE_TURF_IDLEWOOD,
-		CONTEXT_GLOBAL_TAKE_TURF_GANTON,
-		CONTEXT_GLOBAL_TAKE_TURF_LITTLE_MEXICO,
-		CONTEXT_GLOBAL_TAKE_TURF_WILLOWFIELD,
-		CONTEXT_GLOBAL_TAKE_TURF_PLAYA_DEL_SEVILLE,
-		CONTEXT_GLOBAL_TAKE_TURF_TEMPLE,
-	};
-
-	enum PlySpeechContexts
-	{
-		CONTEXT_PLY_TAKE_TURF_EAST_BEACH = 96,
-		CONTEXT_PLY_TAKE_TURF_EAST_LS,
-		CONTEXT_PLY_TAKE_TURF_GANTON,
-		CONTEXT_PLY_TAKE_TURF_GLEN_PARK,
-		CONTEXT_PLY_TAKE_TURF_IDLEWOOD,
-		CONTEXT_PLY_TAKE_TURF_JEFFERSON,
-		CONTEXT_PLY_TAKE_TURF_LAS_COLINAS,
-		CONTEXT_PLY_TAKE_TURF_LITTLE_MEXICO,
-		CONTEXT_PLY_TAKE_TURF_LOS_FLORES,
-		CONTEXT_PLY_TAKE_TURF_PLAYA_DEL_SEVILLE,
-		CONTEXT_PLY_TAKE_TURF_TEMPLE,
-		CONTEXT_PLY_TAKE_TURF_WILLOWFIELD,
-	};
-
-	enum PlySpeechVoices
-	{
-		VOICE_PLY_AG = 0,
-		VOICE_PLY_AG2,
-		VOICE_PLY_AR,
-		VOICE_PLY_AR2,
-		VOICE_PLY_CD,
-		VOICE_PLY_CD2,
-		VOICE_PLY_CF,
-		VOICE_PLY_CF2,
-		VOICE_PLY_CG,
-		VOICE_PLY_CG2,
-		VOICE_PLY_CR,
-		VOICE_PLY_CR2,
-		VOICE_PLY_PG,
-		VOICE_PLY_PG2,
-		VOICE_PLY_PR,
-		VOICE_PLY_PR2,
-		VOICE_PLY_WG,
-		VOICE_PLY_WG2,
-		VOICE_PLY_WR,
-		VOICE_PLY_WR2,
-		VOICE_PLY_END
-	};
-
 	static uint32_t* ConversationTopic;
 
 	static void* (__thiscall* orgPedSay)(void* ped, uint16_t Phrase, void* StartTimeDelay, void* Probability, void* bOverideSilence, void* bForceAudible, void* bFrontEnd);
 	static void* __fastcall PedSay_NegativeWeatherOverride(void* ped, void*, uint16_t Phrase, void* StartTimeDelay, void* Probability, void* bOverideSilence, void* bForceAudible, void* bFrontEnd)
 	{
 		// Positive replies to a negative weather comment need special casing
-		if ((Phrase == 0x83 || Phrase == 0x84) && *ConversationTopic == 7) // (LIKE_DISMISS_FEMALE || LIKE_DISMISS_MALE) && CONV_WEATHER
+		if ((Phrase == CONTEXT_GLOBAL_LIKE_DISMISS_FEMALE || Phrase == CONTEXT_GLOBAL_LIKE_DISMISS_MALE) && *ConversationTopic == AE_CONV_WEATHER)
 		{
-			Phrase = 0xE9; // WEATHER_DISL_REPLY
+			Phrase = CONTEXT_GLOBAL_WEATHER_DISL_REPLY;
 		}
 		return orgPedSay(ped, Phrase, StartTimeDelay, Probability, bOverideSilence, bForceAudible, bFrontEnd);
 	}
@@ -3825,7 +3758,7 @@ namespace SpeechSystemFixes
 
 		// Fallback for player's weather replies - force a CD mood, since only CD and CF moods have responses, and since we cannot update
 		// the speech lookup tables to reference samples across different moods, we need to fake the CD mood for the call.
-		if (result < 0 && obj->m_PedType == 2 && (GlobalSpeechContext == 0xE9 || GlobalSpeechContext == 0xEA)) // PED_TYPE_PLAYER, (WEATHER_DISL_REPLY || WEATHER_LIKE_REPLY)
+		if (result < 0 && obj->m_PedType == PED_TYPE_PLAYER && (GlobalSpeechContext == CONTEXT_GLOBAL_WEATHER_DISL_REPLY || GlobalSpeechContext == CONTEXT_GLOBAL_WEATHER_LIKE_REPLY))
 		{
 			bShouldOverrideWellDressedMood = true;
 			result = func(obj, GlobalSpeechContext, a2);
@@ -3913,6 +3846,63 @@ namespace SpeechSystemFixes
 		return result;
 	}
 
+	namespace Patches
+	{
+		static void PatchSpeechContexts(int16_t (*gSpeechContextLookup)[8])
+		{
+			auto setSpecificSpeechContext = [gSpeechContextLookup](int16_t globalContext, int16_t pedAudioType, int16_t specificContext)
+				{
+					for (size_t i = 0; gSpeechContextLookup[i][0] != -1; ++i)
+					{
+						if (gSpeechContextLookup[i][0] == globalContext)
+						{
+							if (gSpeechContextLookup[i][pedAudioType + 1] == -1)
+							{
+								gSpeechContextLookup[i][pedAudioType + 1] = specificContext;
+							}
+							return;
+						}
+					}
+				};
+
+			// Re-enable CJ's turf takeover cheer speech contexts
+			setSpecificSpeechContext(CONTEXT_GLOBAL_TAKE_TURF_LAS_COLINAS, PED_TYPE_PLAYER, CONTEXT_PLY_TAKE_TURF_LAS_COLINAS);
+			setSpecificSpeechContext(CONTEXT_GLOBAL_TAKE_TURF_LOS_FLORES, PED_TYPE_PLAYER, CONTEXT_PLY_TAKE_TURF_LOS_FLORES);
+			setSpecificSpeechContext(CONTEXT_GLOBAL_TAKE_TURF_EAST_BEACH, PED_TYPE_PLAYER, CONTEXT_PLY_TAKE_TURF_EAST_BEACH);
+			setSpecificSpeechContext(CONTEXT_GLOBAL_TAKE_TURF_EAST_LS, PED_TYPE_PLAYER, CONTEXT_PLY_TAKE_TURF_EAST_LS);
+			setSpecificSpeechContext(CONTEXT_GLOBAL_TAKE_TURF_JEFFERSON, PED_TYPE_PLAYER, CONTEXT_PLY_TAKE_TURF_JEFFERSON);
+			setSpecificSpeechContext(CONTEXT_GLOBAL_TAKE_TURF_GLEN_PARK, PED_TYPE_PLAYER, CONTEXT_PLY_TAKE_TURF_GLEN_PARK);
+			setSpecificSpeechContext(CONTEXT_GLOBAL_TAKE_TURF_IDLEWOOD, PED_TYPE_PLAYER, CONTEXT_PLY_TAKE_TURF_IDLEWOOD);
+			setSpecificSpeechContext(CONTEXT_GLOBAL_TAKE_TURF_GANTON, PED_TYPE_PLAYER, CONTEXT_PLY_TAKE_TURF_GANTON);
+			setSpecificSpeechContext(CONTEXT_GLOBAL_TAKE_TURF_LITTLE_MEXICO, PED_TYPE_PLAYER, CONTEXT_PLY_TAKE_TURF_LITTLE_MEXICO);
+			setSpecificSpeechContext(CONTEXT_GLOBAL_TAKE_TURF_WILLOWFIELD, PED_TYPE_PLAYER, CONTEXT_PLY_TAKE_TURF_WILLOWFIELD);
+			setSpecificSpeechContext(CONTEXT_GLOBAL_TAKE_TURF_PLAYA_DEL_SEVILLE, PED_TYPE_PLAYER, CONTEXT_PLY_TAKE_TURF_PLAYA_DEL_SEVILLE);
+			setSpecificSpeechContext(CONTEXT_GLOBAL_TAKE_TURF_TEMPLE, PED_TYPE_PLAYER, CONTEXT_PLY_TAKE_TURF_TEMPLE);
+
+			// Those contexts have meaningful content for girlfriends and shopkeepers, but are unassigned
+			setSpecificSpeechContext(CONTEXT_GLOBAL_CONV_IGNORED, PED_TYPE_GIRLFRIEND, CONTEXT_GFD_CONV_IGNORED);
+			setSpecificSpeechContext(CONTEXT_GLOBAL_GUN_COOL, PED_TYPE_GIRLFRIEND, CONTEXT_GFD_GUN_COOL);
+			setSpecificSpeechContext(CONTEXT_GLOBAL_LIKE_DISMISS_REPLY, PED_TYPE_GIRLFRIEND, CONTEXT_GFD_LIKE_DISMISS_REPLY);
+			setSpecificSpeechContext(CONTEXT_GLOBAL_PCONV_AGREE_BAD, PED_TYPE_GIRLFRIEND, CONTEXT_GFD_PCONV_AGREE_BAD);
+			setSpecificSpeechContext(CONTEXT_GLOBAL_PCONV_AGREE_GOOD, PED_TYPE_GIRLFRIEND, CONTEXT_GFD_PCONV_AGREE_GOOD);
+			setSpecificSpeechContext(CONTEXT_GLOBAL_PCONV_ANS_NO, PED_TYPE_GIRLFRIEND, CONTEXT_GFD_PCONV_ANS_NO);
+			setSpecificSpeechContext(CONTEXT_GLOBAL_PCONV_DISMISS, PED_TYPE_GIRLFRIEND, CONTEXT_GFD_PCONV_DISMISS);
+			setSpecificSpeechContext(CONTEXT_GLOBAL_PCONV_GREET_FEM, PED_TYPE_GIRLFRIEND, CONTEXT_GFD_PCONV_GREET_FEM);
+			setSpecificSpeechContext(CONTEXT_GLOBAL_PCONV_GREET_MALE, PED_TYPE_GIRLFRIEND, CONTEXT_GFD_PCONV_GREET_MALE);
+			setSpecificSpeechContext(CONTEXT_GLOBAL_PCONV_PART_FEM, PED_TYPE_GIRLFRIEND, CONTEXT_GFD_PCONV_PART_FEM);
+			setSpecificSpeechContext(CONTEXT_GLOBAL_PCONV_PART_MALE, PED_TYPE_GIRLFRIEND, CONTEXT_GFD_PCONV_PART_MALE);
+			setSpecificSpeechContext(CONTEXT_GLOBAL_PCONV_QUESTION, PED_TYPE_GIRLFRIEND, CONTEXT_GFD_PCONV_QUESTION);
+			setSpecificSpeechContext(CONTEXT_GLOBAL_PCONV_STATE_BAD, PED_TYPE_GIRLFRIEND, CONTEXT_GFD_PCONV_STATE_BAD);
+			setSpecificSpeechContext(CONTEXT_GLOBAL_PCONV_STATE_GOOD, PED_TYPE_GIRLFRIEND, CONTEXT_GFD_PCONV_STATE_GOOD);
+			setSpecificSpeechContext(CONTEXT_GLOBAL_SAVED, PED_TYPE_GIRLFRIEND, CONTEXT_GFD_SAVED);
+			setSpecificSpeechContext(CONTEXT_GLOBAL_GUN_RUN, PED_TYPE_GIRLFRIEND, CONTEXT_GFD_GUN_RUN);
+
+			// CONTEXT_GLOBAL_SHOOT_GENERIC for girlfriends/shopkeepers and pedestrians
+			// Currently unused, but this way another mod can enable them
+			setSpecificSpeechContext(CONTEXT_GLOBAL_SHOOT_GENERIC, PED_TYPE_GEN, CONTEXT_GEN_SHOOT_GENERIC);
+			setSpecificSpeechContext(CONTEXT_GLOBAL_SHOOT_GENERIC, PED_TYPE_GIRLFRIEND, CONTEXT_GFD_SHOOT_GENERIC);
+		}
+	}
 }
 
 
@@ -5334,37 +5324,10 @@ BOOL InjectDelayedPatches_10()
 		{
 			using namespace SpeechSystemFixes;
 
-			// Re-enable CJ's turf takeover cheer speech contexts
 			auto gSpeechContextLookup = *reinterpret_cast<int16_t (**)[8]>(0x4E4492 + 1);
 			if (ModCompat::Utils::GetModuleHandleFromAddress(gSpeechContextLookup) == hInstance)
 			{
-				auto setSpecificSpeechContext = [gSpeechContextLookup](int16_t globalContext, int16_t pedAudioType, int16_t specificContext)
-					{
-						for (size_t i = 0; gSpeechContextLookup[i][0] != -1; ++i)
-						{
-							if (gSpeechContextLookup[i][0] == globalContext)
-							{
-								if (gSpeechContextLookup[i][pedAudioType + 1] == -1)
-								{
-									gSpeechContextLookup[i][pedAudioType + 1] = specificContext;
-								}
-								return;
-							}
-						}
-					};
-
-				setSpecificSpeechContext(CONTEXT_GLOBAL_TAKE_TURF_LAS_COLINAS, PED_TYPE_PLAYER, CONTEXT_PLY_TAKE_TURF_LAS_COLINAS);
-				setSpecificSpeechContext(CONTEXT_GLOBAL_TAKE_TURF_LOS_FLORES, PED_TYPE_PLAYER, CONTEXT_PLY_TAKE_TURF_LOS_FLORES);
-				setSpecificSpeechContext(CONTEXT_GLOBAL_TAKE_TURF_EAST_BEACH, PED_TYPE_PLAYER, CONTEXT_PLY_TAKE_TURF_EAST_BEACH);
-				setSpecificSpeechContext(CONTEXT_GLOBAL_TAKE_TURF_EAST_LS, PED_TYPE_PLAYER, CONTEXT_PLY_TAKE_TURF_EAST_LS);
-				setSpecificSpeechContext(CONTEXT_GLOBAL_TAKE_TURF_JEFFERSON, PED_TYPE_PLAYER, CONTEXT_PLY_TAKE_TURF_JEFFERSON);
-				setSpecificSpeechContext(CONTEXT_GLOBAL_TAKE_TURF_GLEN_PARK, PED_TYPE_PLAYER, CONTEXT_PLY_TAKE_TURF_GLEN_PARK);
-				setSpecificSpeechContext(CONTEXT_GLOBAL_TAKE_TURF_IDLEWOOD, PED_TYPE_PLAYER, CONTEXT_PLY_TAKE_TURF_IDLEWOOD);
-				setSpecificSpeechContext(CONTEXT_GLOBAL_TAKE_TURF_GANTON, PED_TYPE_PLAYER, CONTEXT_PLY_TAKE_TURF_GANTON);
-				setSpecificSpeechContext(CONTEXT_GLOBAL_TAKE_TURF_LITTLE_MEXICO, PED_TYPE_PLAYER, CONTEXT_PLY_TAKE_TURF_LITTLE_MEXICO);
-				setSpecificSpeechContext(CONTEXT_GLOBAL_TAKE_TURF_WILLOWFIELD, PED_TYPE_PLAYER, CONTEXT_PLY_TAKE_TURF_WILLOWFIELD);
-				setSpecificSpeechContext(CONTEXT_GLOBAL_TAKE_TURF_PLAYA_DEL_SEVILLE, PED_TYPE_PLAYER, CONTEXT_PLY_TAKE_TURF_PLAYA_DEL_SEVILLE);
-				setSpecificSpeechContext(CONTEXT_GLOBAL_TAKE_TURF_TEMPLE, PED_TYPE_PLAYER, CONTEXT_PLY_TAKE_TURF_TEMPLE);
+				Patches::PatchSpeechContexts(gSpeechContextLookup);
 			}
 		}
 
@@ -6003,37 +5966,10 @@ BOOL InjectDelayedPatches_NewBinaries()
 		{
 			using namespace SpeechSystemFixes;
 
-			// Re-enable CJ's turf takeover cheer speech contexts
 			auto gSpeechContextLookup = *get_pattern<int16_t (*)[8]>("77 3F 66 A1 ? ? ? ? 33 C9 66 83 F8 FF", 2 + 2);
 			if (ModCompat::Utils::GetModuleHandleFromAddress(gSpeechContextLookup) == hInstance)
 			{
-				auto setSpecificSpeechContext = [gSpeechContextLookup](int16_t globalContext, int16_t pedAudioType, int16_t specificContext)
-					{
-						for (size_t i = 0; gSpeechContextLookup[i][0] != -1; ++i)
-						{
-							if (gSpeechContextLookup[i][0] == globalContext)
-							{
-								if (gSpeechContextLookup[i][pedAudioType + 1] == -1)
-								{
-									gSpeechContextLookup[i][pedAudioType + 1] = specificContext;
-								}
-								return;
-							}
-						}
-					};
-
-				setSpecificSpeechContext(CONTEXT_GLOBAL_TAKE_TURF_LAS_COLINAS, PED_TYPE_PLAYER, CONTEXT_PLY_TAKE_TURF_LAS_COLINAS);
-				setSpecificSpeechContext(CONTEXT_GLOBAL_TAKE_TURF_LOS_FLORES, PED_TYPE_PLAYER, CONTEXT_PLY_TAKE_TURF_LOS_FLORES);
-				setSpecificSpeechContext(CONTEXT_GLOBAL_TAKE_TURF_EAST_BEACH, PED_TYPE_PLAYER, CONTEXT_PLY_TAKE_TURF_EAST_BEACH);
-				setSpecificSpeechContext(CONTEXT_GLOBAL_TAKE_TURF_EAST_LS, PED_TYPE_PLAYER, CONTEXT_PLY_TAKE_TURF_EAST_LS);
-				setSpecificSpeechContext(CONTEXT_GLOBAL_TAKE_TURF_JEFFERSON, PED_TYPE_PLAYER, CONTEXT_PLY_TAKE_TURF_JEFFERSON);
-				setSpecificSpeechContext(CONTEXT_GLOBAL_TAKE_TURF_GLEN_PARK, PED_TYPE_PLAYER, CONTEXT_PLY_TAKE_TURF_GLEN_PARK);
-				setSpecificSpeechContext(CONTEXT_GLOBAL_TAKE_TURF_IDLEWOOD, PED_TYPE_PLAYER, CONTEXT_PLY_TAKE_TURF_IDLEWOOD);
-				setSpecificSpeechContext(CONTEXT_GLOBAL_TAKE_TURF_GANTON, PED_TYPE_PLAYER, CONTEXT_PLY_TAKE_TURF_GANTON);
-				setSpecificSpeechContext(CONTEXT_GLOBAL_TAKE_TURF_LITTLE_MEXICO, PED_TYPE_PLAYER, CONTEXT_PLY_TAKE_TURF_LITTLE_MEXICO);
-				setSpecificSpeechContext(CONTEXT_GLOBAL_TAKE_TURF_WILLOWFIELD, PED_TYPE_PLAYER, CONTEXT_PLY_TAKE_TURF_WILLOWFIELD);
-				setSpecificSpeechContext(CONTEXT_GLOBAL_TAKE_TURF_PLAYA_DEL_SEVILLE, PED_TYPE_PLAYER, CONTEXT_PLY_TAKE_TURF_PLAYA_DEL_SEVILLE);
-				setSpecificSpeechContext(CONTEXT_GLOBAL_TAKE_TURF_TEMPLE, PED_TYPE_PLAYER, CONTEXT_PLY_TAKE_TURF_TEMPLE);
+				Patches::PatchSpeechContexts(gSpeechContextLookup);
 			}
 		}
 		TXN_CATCH();

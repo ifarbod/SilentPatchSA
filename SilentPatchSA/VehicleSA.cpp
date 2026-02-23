@@ -7,6 +7,7 @@
 #include "DelimStringReader.hpp"
 #include "PlayerInfoSA.h"
 #include "ParseUtils.hpp"
+#include "SpeechContextsSA.h"
 #include "Random.h"
 
 #include "SVF.h"

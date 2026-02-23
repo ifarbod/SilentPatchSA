@@ -256,6 +256,7 @@
     <ClInclude Include="PoolsSA.h" />
     <ClInclude Include="resource.h" />
     <ClInclude Include="ScriptSA.h" />
+    <ClInclude Include="SpeechContextsSA.h" />
     <ClInclude Include="StdAfxSA.h" />
     <ClInclude Include="TimerSA.h" />
     <ClInclude Include="VehicleSA.h" />
