@@ -3926,6 +3926,9 @@ namespace SpeechSystemFixes
 				tryMoveContext(gGenSpeechLookup, i, CONTEXT_GEN_SAVE, CONTEXT_GEN_SAVED);
 				tryMoveContext(gGenSpeechLookup, i, CONTEXT_GEN_SHOCKE, CONTEXT_GEN_SHOCKED);
 			}
+
+			// VWMOTR1 has a mis-assigned MUGGED context
+			tryMoveContext(gGenSpeechLookup, VOICE_GEN_VWMOTR1, CONTEXT_GEN_MUGGING, CONTEXT_GEN_MUGGED);
 		}
 
 		static void PatchGfdSpeechContexts(int16_t (*gGfdSpeechLookup)[18][2])
