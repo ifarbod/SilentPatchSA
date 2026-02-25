@@ -125,6 +125,7 @@ All the remaining, non-critical fixes.
 * ➕ CJ now cheers after taking over certain districts.
 * ➕ CJ's comments after the solicitation are no longer forced to the Wisecracking mood, so their variety is wider.
 * ➕ Multiple unused dialogue lines for girlfriends and shopkeepers have been re-enabled.
+* ➕ Barbers, tattoo artists and the AmmuNation vendor now say their dialogue lines when CJ spooks them.
 * Detached vehicle parts will now keep the same color and lighting as the vehicle they came from.
 * Detached vehicle parts are now rendered from both sides.
 * Resolved single-pixel wide seams showing on the Map screen with Anti-Aliasing enabled.
