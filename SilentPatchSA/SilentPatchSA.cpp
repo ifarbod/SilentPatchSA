@@ -3848,7 +3848,7 @@ namespace SpeechSystemFixes
 
 	namespace Patches
 	{
-		static void PatchSpeechContexts(int16_t (*gSpeechContextLookup)[8])
+		static void PatchGlobalSpeechContexts(int16_t (*gSpeechContextLookup)[8])
 		{
 			auto setSpecificSpeechContext = [gSpeechContextLookup](int16_t globalContext, int16_t pedAudioType, int16_t specificContext)
 				{
@@ -3901,6 +3901,31 @@ namespace SpeechSystemFixes
 			// Currently unused, but this way another mod can enable them
 			setSpecificSpeechContext(CONTEXT_GLOBAL_SHOOT_GENERIC, PED_TYPE_GEN, CONTEXT_GEN_SHOOT_GENERIC);
 			setSpecificSpeechContext(CONTEXT_GLOBAL_SHOOT_GENERIC, PED_TYPE_GIRLFRIEND, CONTEXT_GFD_SHOOT_GENERIC);
+		}
+
+		template<typename T>
+		static void tryMoveContext (T* speechLookup, size_t voiceID, int16_t source, int16_t destination)
+		{
+			auto& srcVoice = speechLookup[source][voiceID];
+			auto& destVoice = speechLookup[destination][voiceID];
+			constexpr auto NO_VOICE = static_cast<std::decay_t<decltype(srcVoice[0])>>(-1);
+			if (srcVoice[0] != NO_VOICE && srcVoice[1] != NO_VOICE && destVoice[0] == NO_VOICE && destVoice[1] == NO_VOICE)
+			{
+				destVoice[0] = std::exchange(srcVoice[0], NO_VOICE);
+				destVoice[1] = std::exchange(srcVoice[1], NO_VOICE);
+			}
+		}
+
+		static void PatchGenSpeechContexts(uint8_t (*gGenSpeechLookup)[209][2])
+		{
+			// Copy typo'd speech contexts "caused" by VBFYST2 to the correct contexts
+			for (size_t i = 0; i < std::size(*gGenSpeechLookup); i++)
+			{
+				tryMoveContext(gGenSpeechLookup, i, CONTEXT_GEN_CHA, CONTEXT_GEN_CHAT);
+				tryMoveContext(gGenSpeechLookup, i, CONTEXT_GEN_RUN_FROM_FIGH, CONTEXT_GEN_RUN_FROM_FIGHT);
+				tryMoveContext(gGenSpeechLookup, i, CONTEXT_GEN_SAVE, CONTEXT_GEN_SAVED);
+				tryMoveContext(gGenSpeechLookup, i, CONTEXT_GEN_SHOCKE, CONTEXT_GEN_SHOCKED);
+			}
 		}
 	}
 }
@@ -5325,9 +5350,14 @@ BOOL InjectDelayedPatches_10()
 			using namespace SpeechSystemFixes;
 
 			auto gSpeechContextLookup = *reinterpret_cast<int16_t (**)[8]>(0x4E4492 + 1);
+			auto gGenSpeechLookup = *reinterpret_cast<uint8_t (**)[209][2]>(0x4E5A0C + 4);
 			if (ModCompat::Utils::GetModuleHandleFromAddress(gSpeechContextLookup) == hInstance)
 			{
-				Patches::PatchSpeechContexts(gSpeechContextLookup);
+				Patches::PatchGlobalSpeechContexts(gSpeechContextLookup);
+			}
+			if (ModCompat::Utils::GetModuleHandleFromAddress(gGenSpeechLookup) == hInstance)
+			{
+				Patches::PatchGenSpeechContexts(gGenSpeechLookup);
 			}
 		}
 
@@ -5967,9 +5997,14 @@ BOOL InjectDelayedPatches_NewBinaries()
 			using namespace SpeechSystemFixes;
 
 			auto gSpeechContextLookup = *get_pattern<int16_t (*)[8]>("77 3F 66 A1 ? ? ? ? 33 C9 66 83 F8 FF", 2 + 2);
+			auto gGenSpeechLookup = *get_pattern<uint8_t (*)[209][2]>("03 C1 0F B6 B4 00", 2 + 4);
 			if (ModCompat::Utils::GetModuleHandleFromAddress(gSpeechContextLookup) == hInstance)
 			{
-				Patches::PatchSpeechContexts(gSpeechContextLookup);
+				Patches::PatchGlobalSpeechContexts(gSpeechContextLookup);
+			}
+			if (ModCompat::Utils::GetModuleHandleFromAddress(gGenSpeechLookup) == hInstance)
+			{
+				Patches::PatchGenSpeechContexts(gGenSpeechLookup);
 			}
 		}
 		TXN_CATCH();
