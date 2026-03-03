@@ -7325,8 +7325,16 @@ void Patch_SA_10(HINSTANCE hInstance)
 
 
 	// Fix 2 player blips both drawing in P1's position
-	// nop \ push esi
-	Patch(0x588581, { 0x90, 0x56 });
+	{
+		// nop \ push esi
+		Patch(0x588581, { 0x90, 0x56 });
+
+		// mov edx, dword ptr CWorld__Players.pPed[eax]
+		Patch(0x56E2A4, { 0x8B, 0x90 });
+
+		// mov ecx, dword ptr CWorld__Players.pPed[eax]
+		Patch(0x56E2CB, { 0x8B, 0x88 });
+	}
 
 
 	// Stop gang wars clearing the friendly entity blips when the gang war ends
@@ -9774,9 +9782,16 @@ void Patch_SA_NewBinaries_Common(HINSTANCE hInstance)
 	try
 	{
 		auto find_player_centre_of_world = get_pattern("6A 00 52 E8 ? ? ? ? D9 45 84");
+		auto centre_of_world_player_in_focus = pattern("8B 92 ? ? ? ? 85 D2 74 47 F7 82 ? ? ? ? ? ? ? ? 74 3B 83 BA ? ? ? ? ? 74 32 69 C9 ? ? ? ? 8B 89").get_one();
 
 		// nop \ push esi
 		Patch(find_player_centre_of_world, { 0x90, 0x56 });
+
+		// mov edx, dword ptr CWorld__Players.pPed[eax]
+		Patch(centre_of_world_player_in_focus.get<void>(0), { 0x8B, 0x90 });
+
+		// mov ecx, dword ptr CWorld__Players.pPed[eax]
+		Patch(centre_of_world_player_in_focus.get<void>(0x25), { 0x8B, 0x88 });
 	}
 	TXN_CATCH();
 
