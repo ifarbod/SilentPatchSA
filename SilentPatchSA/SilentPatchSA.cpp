@@ -3901,6 +3901,11 @@ namespace SpeechSystemFixes
 			// Currently unused, but this way another mod can enable them
 			setSpecificSpeechContext(CONTEXT_GLOBAL_SHOOT_GENERIC, PED_TYPE_GEN, CONTEXT_GEN_SHOOT_GENERIC);
 			setSpecificSpeechContext(CONTEXT_GLOBAL_SHOOT_GENERIC, PED_TYPE_GIRLFRIEND, CONTEXT_GFD_SHOOT_GENERIC);
+
+			// Unused gang taunts
+			setSpecificSpeechContext(CONTEXT_GLOBAL_ABUSE_TRIAD, PED_TYPE_GANG, CONTEXT_GNG_ABUSE_GANG_TRIADS);
+			setSpecificSpeechContext(CONTEXT_GLOBAL_ABUSE_RIFA, PED_TYPE_GANG, CONTEXT_GNG_ABUSE_GANG_SFR);
+			setSpecificSpeechContext(CONTEXT_GLOBAL_ABUSE_DA_NANG, PED_TYPE_GANG, CONTEXT_GNG_ABUSE_GANG_DNB);
 		}
 
 		template<typename T>
