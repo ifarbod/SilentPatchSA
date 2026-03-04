@@ -2605,7 +2605,7 @@ namespace GetCorrectPedModel_Lapdm1
 	{
 		_asm
 		{
-			cmp		dword ptr [esp+4], 6
+			cmp		dword ptr [esp+4], PEDTYPE_COP
 			jnz		BikerCop_Return
 			mov		dword ptr [eax], 1
 
@@ -3846,6 +3846,29 @@ namespace SpeechSystemFixes
 		return result;
 	}
 
+	static bool DoGangAbuseSpeech_LSV(CPed* ped1, CPed* ped2)
+	{
+		if (ped1->GetPedType() >= PEDTYPE_GANG1 && ped1->GetPedType() <= PEDTYPE_GANG10 && ped2->GetPedType() == PEDTYPE_GANG3)
+		{
+			ped1->Say(CONTEXT_GLOBAL_ABUSE_GANG_LSV);
+			return true;
+		}
+		return false;
+	}
+
+	template<std::size_t Index>
+	static void (*orgDoGangAbuseSpeech)(CPed* ped1, CPed* ped2);
+	template<std::size_t Index>
+	static void DoGangAbuseSpeech_AddLSV(CPed* ped1, CPed* ped2)
+	{
+		if (!DoGangAbuseSpeech_LSV(ped1, ped2))
+		{
+			orgDoGangAbuseSpeech<Index>(ped1, ped2);
+		}
+	}
+
+	HOOK_EACH_INIT(DoGangAbuseSpeech, orgDoGangAbuseSpeech, DoGangAbuseSpeech_AddLSV);
+
 	namespace Patches
 	{
 		static void PatchGlobalSpeechContexts(int16_t (*gSpeechContextLookup)[8])
@@ -3909,7 +3932,7 @@ namespace SpeechSystemFixes
 		}
 
 		template<typename T>
-		static void tryMoveContext (T* speechLookup, size_t voiceID, int16_t source, int16_t destination)
+		static void tryMoveContext(T* speechLookup, size_t voiceID, int16_t source, int16_t destination)
 		{
 			auto& srcVoice = speechLookup[source][voiceID];
 			auto& destVoice = speechLookup[destination][voiceID];
@@ -7388,6 +7411,12 @@ void Patch_SA_10(HINSTANCE hInstance)
 		// Change CJ's mood to WR after playing the solicit line, not before, so non-WR lines end up getting used
 		InterceptCall(0x666A82, orgSetCJMood, SetCJMood_Store);
 		InterceptCall(0x666A9C, orgPedSay_Solicit, PedSay_Solicit_ChangeMood);
+
+		// Add missing LSV taunt speech to CTaskComplexGangLeader::DoGangAbuseSpeech
+		std::array<intptr_t, 2> do_gang_abuse_speech = {
+			0x660248, 0x66069E
+		};
+		HookEach_DoGangAbuseSpeech(do_gang_abuse_speech, InterceptCall);
 	}
 }
 
@@ -9905,6 +9934,17 @@ void Patch_SA_NewBinaries_Common(HINSTANCE hInstance)
 
 			InterceptCall(task_solicit.get<void>(0), orgSetCJMood, SetCJMood_Store);
 			InterceptCall(task_solicit.get<void>(0x1B), orgPedSay_Solicit, PedSay_Solicit_ChangeMood);
+		}
+		TXN_CATCH();
+
+		// Add missing LSV taunt speech to CTaskComplexGangLeader::DoGangAbuseSpeech
+		try
+		{
+			std::array<void*, 2> do_gang_abuse_speech = {
+				get_pattern("E8 ? ? ? ? 83 C4 08 8B 46 08 8B 4D F4 5F 5E 64 89 0D"),
+				get_pattern("E8 ? ? ? ? 83 C4 08 38 5E 24")
+			};
+			HookEach_DoGangAbuseSpeech(do_gang_abuse_speech, InterceptCall);
 		}
 		TXN_CATCH();
 	}

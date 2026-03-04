@@ -7,6 +7,43 @@ class CEvent;
 class CPed;
 class CVehicle;
 
+enum ePedType
+{
+	PEDTYPE_PLAYER1 = 0,
+	PEDTYPE_PLAYER2,
+	PEDTYPE_PLAYER_NETWORK,
+	PEDTYPE_PLAYER_UNUSED,
+	PEDTYPE_CIVMALE,
+	PEDTYPE_CIVFEMALE,
+	PEDTYPE_COP,
+	PEDTYPE_GANG1,
+	PEDTYPE_GANG2,
+	PEDTYPE_GANG3,
+	PEDTYPE_GANG4,
+	PEDTYPE_GANG5,
+	PEDTYPE_GANG6,
+	PEDTYPE_GANG7,
+	PEDTYPE_GANG8,
+	PEDTYPE_GANG9,
+	PEDTYPE_GANG10,
+	PEDTYPE_DEALER,
+	PEDTYPE_MEDIC,
+	PEDTYPE_FIRE,
+	PEDTYPE_CRIMINAL,
+	PEDTYPE_BUM,
+	PEDTYPE_PROSTITUTE,
+	PEDTYPE_SPECIAL,
+	PEDTYPE_MISSION1,
+	PEDTYPE_MISSION2,
+	PEDTYPE_MISSION3,
+	PEDTYPE_MISSION4,
+	PEDTYPE_MISSION5,
+	PEDTYPE_MISSION6,
+	PEDTYPE_MISSION7,
+	PEDTYPE_MISSION8,
+	PEDTYPE_LAST_PEDTYPE
+};
+
 // This structure is very incomplete, but it is good enough for now
 class __declspec(novtable) CTask
 {
@@ -327,7 +364,7 @@ public:
 	BYTE				__pad3[44];
 	CVehicle*			pVehicle;
 	BYTE				__pad9[8];
-	DWORD				pedType;
+	int32_t				m_nPedType;
 	BYTE				__pad4[4];
 	CWeapon				weaponSlots[13];
 	BYTE				__pad5[12];
@@ -347,8 +384,8 @@ public:
 	virtual bool		Save();
 	virtual bool		Load();
 
-	inline DWORD		GetPedType() 
-							{ return pedType; };
+	inline int32_t	GetPedType() const
+							{ return m_nPedType; };
 	inline CPedFlags&	GetPedFlags() 
 							{ return pedFlags; };
 	inline CVehicle*	GetVehiclePtr() 
@@ -376,12 +413,12 @@ public:
 		{ m_fTargetRotation = fVal; }
 
 	bool				IsPlayer() const
-		{ return pedType == 0 || pedType == 1; }
+		{ return m_nPedType == PEDTYPE_PLAYER1 || m_nPedType == PEDTYPE_PLAYER2; }
 
 	uint8_t				GetWeaponSkill();
 	void				ResetGunFlashAlpha();
 	void				SetGunFlashAlpha(bool bSecondWeapon);
-	int16_t				Say(uint16_t phrase, uint32_t param2 = 0, float volume = 1.0f, bool param4 = false, bool param5 = false, bool param6 = false);
+	int16_t				Say(uint16_t phrase, uint32_t StartTimeDelay = 0, float Probability = 1.0f, bool bOverideSilence = false, bool bForceAudible = false, bool bFrontEnd = false);
 
 	void				RenderWeapon(bool bWeapon, bool bMuzzleFlash, bool bForShadow);
 	void				RenderForShadow();
