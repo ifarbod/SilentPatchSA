@@ -3968,6 +3968,15 @@ namespace SpeechSystemFixes
 				tryMoveContext(gGfdSpeechLookup, i, CONTEXT_GFD_SHOOT_GENERIC, CONTEXT_GFD_SHOP_CLOSED);
 			}
 		}
+
+		static void PatchPlySpeechContexts(int16_t (*gPlySpeechLookup)[20][2])
+		{
+			// Copy typo'd speech contexts to the correct contexts
+			for (size_t i = 0; i < std::size(*gPlySpeechLookup); i++)
+			{
+				tryMoveContext(gPlySpeechLookup, i, CONTEXT_PLY_JACKING_CAR_FEMALE, CONTEXT_PLY_JACKING_CAR_FEM);
+			}
+		}
 	}
 }
 
@@ -5393,6 +5402,7 @@ BOOL InjectDelayedPatches_10()
 			auto gSpeechContextLookup = *reinterpret_cast<int16_t (**)[8]>(0x4E4492 + 1);
 			auto gGenSpeechLookup = *reinterpret_cast<uint8_t (**)[209][2]>(0x4E5A0C + 4);
 			auto gGfdSpeechLookup = *reinterpret_cast<int16_t (**)[18][2]>(0x4E5B51 + 3);
+			auto gPlySpeechLookup = *reinterpret_cast<int16_t (**)[20][2]>(0x4E5AD4 + 3);
 			if (ModCompat::Utils::GetModuleHandleFromAddress(gSpeechContextLookup) == hInstance)
 			{
 				Patches::PatchGlobalSpeechContexts(gSpeechContextLookup);
@@ -5404,6 +5414,10 @@ BOOL InjectDelayedPatches_10()
 			if (ModCompat::Utils::GetModuleHandleFromAddress(gGfdSpeechLookup) == hInstance)
 			{
 				Patches::PatchGfdSpeechContexts(gGfdSpeechLookup);
+			}
+			if (ModCompat::Utils::GetModuleHandleFromAddress(gPlySpeechLookup) == hInstance)
+			{
+				Patches::PatchPlySpeechContexts(gPlySpeechLookup);
 			}
 		}
 
@@ -6045,6 +6059,7 @@ BOOL InjectDelayedPatches_NewBinaries()
 			auto gSpeechContextLookup = *get_pattern<int16_t (*)[8]>("77 3F 66 A1 ? ? ? ? 33 C9 66 83 F8 FF", 2 + 2);
 			auto gGenSpeechLookup = *get_pattern<uint8_t (*)[209][2]>("03 C1 0F B6 B4 00", 2 + 4);
 			auto gGfdSpeechLookup = *get_pattern<int16_t (*)[18][2]>("0F B7 B4 00 ? ? ? ? 03 C0 0F B7 80 ? ? ? ? 66 83 FE FF", 4);
+			auto gPlySpeechLookup = *get_pattern<int16_t (*)[20][2]>("8D 04 90 03 C0 0F B7 B4 00 ? ? ? ? 03 C0", 5 + 4);
 			if (ModCompat::Utils::GetModuleHandleFromAddress(gSpeechContextLookup) == hInstance)
 			{
 				Patches::PatchGlobalSpeechContexts(gSpeechContextLookup);
@@ -6056,6 +6071,10 @@ BOOL InjectDelayedPatches_NewBinaries()
 			if (ModCompat::Utils::GetModuleHandleFromAddress(gGfdSpeechLookup) == hInstance)
 			{
 				Patches::PatchGfdSpeechContexts(gGfdSpeechLookup);
+			}
+			if (ModCompat::Utils::GetModuleHandleFromAddress(gPlySpeechLookup) == hInstance)
+			{
+				Patches::PatchPlySpeechContexts(gPlySpeechLookup);
 			}
 		}
 		TXN_CATCH();
