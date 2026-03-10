@@ -3918,6 +3918,8 @@ namespace SpeechSystemFixes
 			setSpecificSpeechContext(CONTEXT_GLOBAL_PCONV_STATE_BAD, PED_TYPE_GIRLFRIEND, CONTEXT_GFD_PCONV_STATE_BAD);
 			setSpecificSpeechContext(CONTEXT_GLOBAL_PCONV_STATE_GOOD, PED_TYPE_GIRLFRIEND, CONTEXT_GFD_PCONV_STATE_GOOD);
 			setSpecificSpeechContext(CONTEXT_GLOBAL_SAVED, PED_TYPE_GIRLFRIEND, CONTEXT_GFD_SAVED);
+			setSpecificSpeechContext(CONTEXT_GLOBAL_SHOCKED, PED_TYPE_GIRLFRIEND, CONTEXT_GFD_SHOCKED);
+			setSpecificSpeechContext(CONTEXT_GLOBAL_TRAPPED, PED_TYPE_GIRLFRIEND, CONTEXT_GFD_TRAPPED);
 			setSpecificSpeechContext(CONTEXT_GLOBAL_GUN_RUN, PED_TYPE_GIRLFRIEND, CONTEXT_GFD_GUN_RUN);
 
 			// CONTEXT_GLOBAL_SHOOT_GENERIC for girlfriends/shopkeepers and pedestrians
@@ -3963,9 +3965,11 @@ namespace SpeechSystemFixes
 		{
 			// CONTEXT_GFD_SHOOT_GENERIC contains data meaningful for CONTEXT_GFD_SHOP_CLOSED,
 			// so moving it restores lines for barbers/AmmuNation keepers when they are spooked.
+			// CONTEXT_GFD_CAR_ON_FIRE is an incorrect context.
 			for (size_t i = 0; i < std::size(*gGfdSpeechLookup); i++)
 			{
 				tryMoveContext(gGfdSpeechLookup, i, CONTEXT_GFD_SHOOT_GENERIC, CONTEXT_GFD_SHOP_CLOSED);
+				tryMoveContext(gGfdSpeechLookup, i, CONTEXT_GFD_CAR_ON_FIRE, CONTEXT_GFD_CAR_FIRE);
 			}
 		}
 
