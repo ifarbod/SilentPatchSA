@@ -121,7 +121,7 @@ All the remaining, non-critical fixes.
 * ➕ Gang wars no longer remove map blips of the player's gang.
 * ➕ Pedestrians can now initiate conversations about the weather, and CJ can respond to their comments correctly.
 * ➕ Criminals running away from cops will now play their correct dialogue lines instead of screaming (contributed by **iFarbod**).
-* ➕ WMYSGRD, BMYPIMP and VBFYST2 now have the correct voices.
+* ➕ WMYSGRD, BMYPIMP, VBFYST2 and Maccer now have voices.
 * ➕ CJ now cheers after taking over certain districts.
 * ➕ CJ's comments after the solicitation are no longer forced to the Wisecracking mood, so their variety is wider.
 * ➕ Multiple unused dialogue lines for girlfriends and shopkeepers have been re-enabled.
