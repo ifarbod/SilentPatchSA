@@ -129,6 +129,7 @@ All the remaining, non-critical fixes.
 * ➕ VWMOTR1 now uses his correct lines when getting mugged.
 * ➕ Restored the gang taunt voice lines against Los Santos Vagos, Triads, San Fierro Rifa, and Da Nang Boys.
 * ➕ Restored several incorrectly assigned CJ's voice lines for stealing cars from women.
+* ➕ CJ will now make comments when crashing into another vehicle while on a motorbike.
 * Detached vehicle parts will now keep the same color and lighting as the vehicle they came from.
 * Detached vehicle parts are now rendered from both sides.
 * Resolved single-pixel wide seams showing on the Map screen with Anti-Aliasing enabled.

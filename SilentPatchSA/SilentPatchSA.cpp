@@ -3733,7 +3733,7 @@ namespace SpeechSystemFixes
 {
 	static uint32_t* ConversationTopic;
 
-	static void* (__thiscall* orgPedSay)(void* ped, uint16_t Phrase, void* StartTimeDelay, void* Probability, void* bOverideSilence, void* bForceAudible, void* bFrontEnd);
+	static void* (__thiscall* orgPedSay_Weather)(void* ped, uint16_t Phrase, void* StartTimeDelay, void* Probability, void* bOverideSilence, void* bForceAudible, void* bFrontEnd);
 	static void* __fastcall PedSay_NegativeWeatherOverride(void* ped, void*, uint16_t Phrase, void* StartTimeDelay, void* Probability, void* bOverideSilence, void* bForceAudible, void* bFrontEnd)
 	{
 		// Positive replies to a negative weather comment need special casing
@@ -3741,7 +3741,7 @@ namespace SpeechSystemFixes
 		{
 			Phrase = CONTEXT_GLOBAL_WEATHER_DISL_REPLY;
 		}
-		return orgPedSay(ped, Phrase, StartTimeDelay, Probability, bOverideSilence, bForceAudible, bFrontEnd);
+		return orgPedSay_Weather(ped, Phrase, StartTimeDelay, Probability, bOverideSilence, bForceAudible, bFrontEnd);
 	}
 
 	static bool bShouldOverrideWellDressedMood = false;
@@ -3868,6 +3868,27 @@ namespace SpeechSystemFixes
 	}
 
 	HOOK_EACH_INIT(DoGangAbuseSpeech, orgDoGangAbuseSpeech, DoGangAbuseSpeech_AddLSV);
+
+	static int16_t PedSay_VehicleDamageFallback_Internal(int16_t (__thiscall* func)(void* ped, uint16_t Phrase, void* StartTimeDelay, void* Probability, void* bOverideSilence, void* bForceAudible, void* bFrontEnd),
+		void* ped, uint16_t Phrase, void* StartTimeDelay, void* Probability, void* bOverideSilence, void* bForceAudible, void* bFrontEnd)
+	{
+		int16_t result = func(ped, Phrase, StartTimeDelay, Probability, bOverideSilence, bForceAudible, bFrontEnd);
+		if (result < 0 && Phrase != CONTEXT_GLOBAL_CRASH_GENERIC)
+		{
+			result = func(ped, CONTEXT_GLOBAL_CRASH_GENERIC, StartTimeDelay, Probability, bOverideSilence, bForceAudible, bFrontEnd);
+		}
+		return result;
+	}
+
+	template<std::size_t Index>
+	static int16_t (__thiscall* orgPedSay_VehicleDamage)(void* ped, uint16_t Phrase, void* StartTimeDelay, void* Probability, void* bOverideSilence, void* bForceAudible, void* bFrontEnd);
+	template<std::size_t Index>
+	static int16_t __fastcall PedSay_VehicleDamageFallback(void* ped, void*, uint16_t Phrase, void* StartTimeDelay, void* Probability, void* bOverideSilence, void* bForceAudible, void* bFrontEnd)
+	{
+		return PedSay_VehicleDamageFallback_Internal(orgPedSay_VehicleDamage<Index>, ped, Phrase, StartTimeDelay, Probability, bOverideSilence, bForceAudible, bFrontEnd);
+	}
+
+	HOOK_EACH_INIT(VehicleDamageFallback, orgPedSay_VehicleDamage, PedSay_VehicleDamageFallback);
 
 	namespace Patches
 	{
@@ -7435,7 +7456,7 @@ void Patch_SA_10(HINSTANCE hInstance)
 		ConversationTopic = *(uint32_t**)(0x43BE8A + 1);
 
 		Patch<int8_t>(0x43B341 + 1, 8); // Let AE_CONV_WEATHER be picked by peds
-		InterceptCall(0x43BE4A, orgPedSay, PedSay_NegativeWeatherOverride); // Add a special case for a positive reply to a negative weather comment
+		InterceptCall(0x43BE4A, orgPedSay_Weather, PedSay_NegativeWeatherOverride); // Add a special case for a positive reply to a negative weather comment
 
 		// Special case CJ's weather responses to fall back to the CD mood instead of CR
 		std::array<intptr_t, 1> get_sound_and_bank_ids = {
@@ -7473,6 +7494,13 @@ void Patch_SA_10(HINSTANCE hInstance)
 			0x660248, 0x66069E
 		};
 		HookEach_DoGangAbuseSpeech(do_gang_abuse_speech, InterceptCall);
+
+		// Add a CRASH_GENERIC fallback, as not everyone has CRASH_CAR or CRASH_BIKE
+		// For example, CJ has no CRASH_BIKE lines, so he's never commenting on crashes when on a bike
+		std::array<intptr_t, 2> vehicle_damage_fallback = {
+			0x6A8254, 0x6B9145
+		};
+		HookEach_VehicleDamageFallback(vehicle_damage_fallback, InterceptCall);
 	}
 }
 
@@ -9920,7 +9948,7 @@ void Patch_SA_NewBinaries_Common(HINSTANCE hInstance)
 			auto ped_say_negative_weather_override = get_pattern("E8 ? ? ? ? 8B 0D ? ? ? ? 89 3D");
 			ConversationTopic = *get_pattern<uint32_t*>("A1 ? ? ? ? 83 E8 08", 1);
 
-			InterceptCall(ped_say_negative_weather_override, orgPedSay, PedSay_NegativeWeatherOverride); // Add a special case for a positive reply to a negative weather comment
+			InterceptCall(ped_say_negative_weather_override, orgPedSay_Weather, PedSay_NegativeWeatherOverride); // Add a special case for a positive reply to a negative weather comment
 		}
 		TXN_CATCH();
 
@@ -10001,6 +10029,18 @@ void Patch_SA_NewBinaries_Common(HINSTANCE hInstance)
 				get_pattern("E8 ? ? ? ? 83 C4 08 38 5E 24")
 			};
 			HookEach_DoGangAbuseSpeech(do_gang_abuse_speech, InterceptCall);
+		}
+		TXN_CATCH();
+
+		// Add a CRASH_GENERIC fallback, as not everyone has CRASH_CAR or CRASH_BIKE
+		// For example, CJ has no CRASH_BIKE lines, so he's never commenting on crashes when on a bike
+		try
+		{
+			std::array<void*, 2> vehicle_damage_fallback = {
+				get_pattern("6A 43 E8 ? ? ? ? 6A 00", 2),
+				get_pattern("6A 42 E8 ? ? ? ? D9 86", 2),
+			};
+			HookEach_VehicleDamageFallback(vehicle_damage_fallback, InterceptCall);
 		}
 		TXN_CATCH();
 	}
